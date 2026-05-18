@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "0437388fa5f6",
+  "strategy": "manual-commit",
+  "branch": "codex/entire-upgrade-plugin",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "internal/cli/doctor.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/04/37388fa5f6/0/metadata.json",
+      "transcript": "/04/37388fa5f6/0/full.jsonl",
+      "content_hash": "/04/37388fa5f6/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1476,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 388736,
+    "output_tokens": 402,
+    "api_call_count": 3
+  }
+}
