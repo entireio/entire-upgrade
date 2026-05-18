@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -53,11 +52,8 @@ func (c ReleaseChecker) latestNightly(ctx context.Context) (Version, error) {
 
 	var latest Version
 	for _, release := range releases {
-		if !strings.Contains(release.TagName, "nightly") {
-			continue
-		}
 		version, err := ParseVersion(release.TagName)
-		if err != nil {
+		if err != nil || !version.IsNightly() {
 			continue
 		}
 		if !latest.Present || version.Compare(latest) > 0 {

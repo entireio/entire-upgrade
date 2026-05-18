@@ -32,6 +32,7 @@ func TestReleaseCheckerLatestNightlyChoosesNewest(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`[
 			{"tag_name":"v0.6.1"},
+			{"tag_name":"v9.9.9-not-nightly.1"},
 			{"tag_name":"v0.6.2-nightly.202605150717.11da3db0"},
 			{"tag_name":"v0.6.2-nightly.202605160654.ddf1a331"}
 		]`))
