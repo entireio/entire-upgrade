@@ -80,3 +80,19 @@ func TestReleaseCheckerLatestNightlyPaginates(t *testing.T) {
 		t.Fatalf("latest nightly = %s", got)
 	}
 }
+
+func TestReleaseCheckerDoesNotSendTokenToOverrideBaseURL(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "secret")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization header = %q, want empty", got)
+		}
+		_, _ = w.Write([]byte(`{"tag_name":"v0.6.1"}`))
+	}))
+	defer server.Close()
+
+	if _, err := (ReleaseChecker{BaseURL: server.URL}).Latest(context.Background(), StableChannel); err != nil {
+		t.Fatal(err)
+	}
+}

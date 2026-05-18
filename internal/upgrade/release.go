@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -93,7 +94,7 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" && shouldSendGitHubToken(req.URL) {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
@@ -110,4 +111,8 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 		return fmt.Errorf("decode Entire CLI release response: %w", err)
 	}
 	return nil
+}
+
+func shouldSendGitHubToken(u *url.URL) bool {
+	return strings.EqualFold(u.Hostname(), "api.github.com")
 }
