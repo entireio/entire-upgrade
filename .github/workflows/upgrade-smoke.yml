@@ -20,6 +20,9 @@ on:
       - "go.sum"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   homebrew:
     name: Homebrew install path
