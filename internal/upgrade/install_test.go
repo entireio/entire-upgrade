@@ -141,6 +141,17 @@ func TestInstallCommands(t *testing.T) {
 	}
 }
 
+func TestInstallRejectsUnsupportedChannel(t *testing.T) {
+	runner := &recordRunner{}
+	err := Install(context.Background(), runner, Installation{Method: MethodCurl}, mustVersion(t, "0.6.1"), Channel("stable; evil"))
+	if err == nil {
+		t.Fatal("expected unsupported channel to fail")
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("commands = %#v, want none", runner.commands)
+	}
+}
+
 type recordRunner struct {
 	commands []string
 }

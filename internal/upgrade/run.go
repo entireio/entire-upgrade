@@ -110,6 +110,10 @@ func installedChannel(install Installation) Channel {
 }
 
 func Install(ctx context.Context, runner Runner, install Installation, target Version, channel Channel) error {
+	if err := validateChannel(channel); err != nil {
+		return err
+	}
+
 	switch install.Method {
 	case MethodHomebrew:
 		return installWithHomebrew(ctx, runner, install, channel)
@@ -119,6 +123,15 @@ func Install(ctx context.Context, runner Runner, install Installation, target Ve
 		return installWithGo(ctx, runner, target)
 	default:
 		return fmt.Errorf("unsupported install method %q", install.Method)
+	}
+}
+
+func validateChannel(channel Channel) error {
+	switch channel {
+	case StableChannel, NightlyChannel:
+		return nil
+	default:
+		return fmt.Errorf("unsupported release channel %q", channel)
 	}
 }
 
