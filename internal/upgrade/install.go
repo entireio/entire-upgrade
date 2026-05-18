@@ -35,7 +35,7 @@ type Environment struct {
 func DetectInstallation(ctx context.Context) (Installation, error) {
 	binaryPath, err := exec.LookPath("entire")
 	if err != nil {
-		return Installation{}, fmt.Errorf("entire CLI not found on PATH")
+		return Installation{}, fmt.Errorf("entire CLI not found on PATH: %w", err)
 	}
 
 	resolvedPath, err := filepath.EvalSymlinks(binaryPath)
