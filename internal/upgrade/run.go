@@ -173,6 +173,9 @@ func installWithCurl(ctx context.Context, runner Runner, channel Channel) error 
 }
 
 func installWithGo(ctx context.Context, runner Runner, target Version) error {
+	if !target.Present {
+		return fmt.Errorf("go install target version is empty")
+	}
 	module := "github.com/entireio/cli/cmd/entire@" + target.Tag()
 	if err := runner.Run(ctx, "go", "install", module); err != nil {
 		return fmt.Errorf("go install %s: %w", module, err)

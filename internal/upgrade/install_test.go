@@ -152,6 +152,17 @@ func TestInstallRejectsUnsupportedChannel(t *testing.T) {
 	}
 }
 
+func TestInstallRejectsEmptyGoTarget(t *testing.T) {
+	runner := &recordRunner{}
+	err := Install(context.Background(), runner, Installation{Method: MethodGo}, Version{}, StableChannel)
+	if err == nil {
+		t.Fatal("expected empty go target to fail")
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("commands = %#v, want none", runner.commands)
+	}
+}
+
 type recordRunner struct {
 	commands []string
 }
