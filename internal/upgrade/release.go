@@ -15,6 +15,7 @@ const defaultGitHubAPIBase = "https://api.github.com/repos/entireio/cli"
 const githubAPIBaseEnv = "ENTIRE_UPGRADE_GITHUB_API_BASE_URL"
 const defaultReleaseFetchTimeout = 30 * time.Second
 const githubReleasePageSize = 100
+const githubUserAgent = "entire-upgrade"
 
 type ReleaseChecker struct {
 	BaseURL string
@@ -94,6 +95,7 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", githubUserAgent)
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" && shouldSendGitHubToken(req.URL) {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

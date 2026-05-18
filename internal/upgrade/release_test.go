@@ -13,6 +13,9 @@ func TestReleaseCheckerLatestStable(t *testing.T) {
 		if r.URL.Path != "/releases/latest" {
 			t.Fatalf("path = %s, want /releases/latest", r.URL.Path)
 		}
+		if got := r.Header.Get("User-Agent"); got != githubUserAgent {
+			t.Fatalf("User-Agent = %q, want %q", got, githubUserAgent)
+		}
 		_, _ = w.Write([]byte(`{"tag_name":"v0.6.1"}`))
 	}))
 	defer server.Close()
