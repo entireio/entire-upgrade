@@ -60,8 +60,33 @@ func Save(dataDir string, cfg Config) error {
 		return fmt.Errorf("encode config: %w", err)
 	}
 	data = append(data, '\n')
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp config: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write temp config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp config: %w", err)
+	}
+	if err := replaceFile(tmpName, path); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil
+}
+
+func replaceFile(oldPath, newPath string) error {
+	if err := os.Rename(oldPath, newPath); err == nil {
+		return nil
+	}
+
+	if err := os.Remove(newPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.Rename(oldPath, newPath)
 }

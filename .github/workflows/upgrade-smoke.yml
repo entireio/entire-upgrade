@@ -1,0 +1,106 @@
+name: upgrade-smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/upgrade-smoke.yml"
+      - "cmd/entire-upgrade/**"
+      - "internal/upgrade/**"
+      - "internal/cli/**"
+      - "go.mod"
+      - "go.sum"
+  pull_request:
+    paths:
+      - ".github/workflows/upgrade-smoke.yml"
+      - "cmd/entire-upgrade/**"
+      - "internal/upgrade/**"
+      - "internal/cli/**"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  homebrew:
+    name: Homebrew install path
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: { go-version: "1.26.2" }
+      - run: go build -o entire-upgrade ./cmd/entire-upgrade
+      - name: Install Entire via Homebrew
+        run: |
+          brew tap entireio/tap
+          for cask in entire entire@nightly; do
+            if brew list --cask "$cask" >/dev/null 2>&1; then
+              brew uninstall --cask "$cask"
+            fi
+          done
+          brew install --cask entire
+          entire --version
+      - name: Exercise upgrade plugin
+        run: |
+          ./entire-upgrade | tee stable.log
+          grep -F "(homebrew install)" stable.log
+          ./entire-upgrade --nightly | tee nightly.log
+          grep -F "(homebrew install)" nightly.log
+          hash -r
+          entire --version
+
+  curl:
+    name: install.sh path
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: { go-version: "1.26.2" }
+      - run: go build -o entire-upgrade ./cmd/entire-upgrade
+      - name: Configure isolated HOME
+        run: |
+          echo "HOME=$RUNNER_TEMP/entire-curl-home" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/entire-curl-home/.local/bin" >> "$GITHUB_PATH"
+      - name: Install Entire via install.sh
+        run: |
+          set -o pipefail
+          mkdir -p "$HOME"
+          curl -fsSL https://entire.io/install.sh | bash
+          entire --version
+      - name: Exercise upgrade plugin
+        run: |
+          ./entire-upgrade | tee stable.log
+          grep -F "(curl install)" stable.log
+          ./entire-upgrade --nightly | tee nightly.log
+          grep -F "(curl install)" nightly.log
+          entire --version
+
+  go:
+    name: go install path
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: { go-version: "1.26.2" }
+      - run: go build -o entire-upgrade ./cmd/entire-upgrade
+      - name: Configure isolated GOBIN
+        run: |
+          echo "GOBIN=$RUNNER_TEMP/entire-go-bin" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/entire-go-bin" >> "$GITHUB_PATH"
+      - name: Install Entire via go install
+        run: |
+          mkdir -p "$GOBIN"
+          go install github.com/entireio/cli/cmd/entire@v0.6.1
+          entire --version
+      - name: Exercise upgrade plugin
+        run: |
+          ./entire-upgrade | tee stable.log
+          grep -F "(go install)" stable.log
+          ./entire-upgrade --nightly | tee nightly.log
+          grep -F "(go install)" nightly.log
+          entire --version

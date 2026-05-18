@@ -12,6 +12,7 @@ func newDoctorCommand(env EntireEnv) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check the parent Entire CLI plugin environment",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDoctor(cmd, env)
 		},
@@ -36,6 +37,7 @@ func runDoctor(cmd *cobra.Command, env EntireEnv) error {
 		return fmt.Errorf("write plugin data dir: %w", err)
 	}
 	name := f.Name()
+	defer os.Remove(name)
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("close write probe: %w", err)
 	}
