@@ -32,6 +32,24 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveReplacesExistingConfig(t *testing.T) {
+	dataDir := t.TempDir()
+	if err := Save(dataDir, Config{Greeting: "first"}); err != nil {
+		t.Fatalf("Save first: %v", err)
+	}
+	if err := Save(dataDir, Config{Greeting: "second"}); err != nil {
+		t.Fatalf("Save second: %v", err)
+	}
+
+	got, err := Load(dataDir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.Greeting != "second" {
+		t.Fatalf("Greeting = %q, want second", got.Greeting)
+	}
+}
+
 func TestLoadFillsMissingGreeting(t *testing.T) {
 	dataDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dataDir, "config.json"), []byte("{}\n"), 0o600); err != nil {
