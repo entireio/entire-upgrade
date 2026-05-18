@@ -1,9 +1,7 @@
 # entire-upgrade
 
-An Entire CLI external-command plugin. It is modeled
-after `entire-sandbox`: Go + Cobra, `mise` tasks, CI, devcontainer support, and
-the `.codex` / `.entire` project config that Entire-enabled repos normally
-carry.
+An Entire CLI external-command plugin that upgrades the system-installed
+`entire` binary.
 
 Entire external commands are plain executables named `entire-<name>` on `PATH`.
 When a user runs `entire <name>`, the parent CLI dispatches to that binary and
@@ -15,6 +13,17 @@ This plugin builds a binary named `entire-upgrade`, which is invoked as:
 entire upgrade
 ```
 
+By default it checks the stable release channel and installs only when the
+latest stable build is newer than the current binary. Use `--nightly` to opt
+into the latest nightly build:
+
+```sh
+entire upgrade --nightly
+```
+
+The plugin detects whether the active `entire` binary was installed through
+Homebrew, `install.sh`, or `go install`, then runs the matching updater.
+
 ## Quick Start
 
 ```sh
@@ -23,28 +32,26 @@ mise run test
 mise run build
 
 entire plugin install ./entire-upgrade
-entire upgrade doctor
+entire upgrade
 ```
 
 For local development without installing the binary, run it directly:
 
 ```sh
 go run ./cmd/entire-upgrade
+go run ./cmd/entire-upgrade --nightly
 ```
 
-Some commands, such as `doctor` and `config`, expect to run through the Entire
-CLI so `ENTIRE_PLUGIN_DATA_DIR` is present. For standalone testing, set it:
-
-```sh
-ENTIRE_PLUGIN_DATA_DIR="$(mktemp -d)" go run ./cmd/entire-upgrade doctor
-```
+The `doctor`, `config`, and `version` subcommands are retained for local
+diagnostics and plugin-environment inspection.
 
 ## Layout
 
 ```text
 cmd/entire-upgrade/           Binary entry point
 internal/cli/                 Cobra commands and Entire environment handling
-internal/config/              Small durable-state example
+internal/upgrade/             Install detection, release checks, and updaters
+internal/config/              Small durable-state diagnostic example
 mise-tasks/lint/              File-based mise lint tasks
 .codex/                       Codex hooks and Entire search agent config
 .claude/                      Claude Code hooks and Entire search agent config
@@ -83,3 +90,9 @@ mise run test:ci    # go test -race ./...
 mise run build      # build ./entire-upgrade
 mise run build-all  # cross-build common Entire targets
 ```
+
+## CI
+
+`.github/workflows/test.yml` runs lint, cross-builds, and tests on Linux,
+macOS, and Windows. `.github/workflows/upgrade-smoke.yml` runs macOS smoke
+tests against real Homebrew, `install.sh`, and `go install` install paths.

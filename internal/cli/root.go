@@ -1,15 +1,16 @@
 package cli
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/entireio/entire-upgrade/internal/config"
+	"github.com/entireio/entire-upgrade/internal/upgrade"
 	"github.com/spf13/cobra"
 )
 
 type Options struct {
-	Version string
-	Env     EntireEnv
+	Version       string
+	Env           EntireEnv
+	UpgradeRunner func(context.Context, upgrade.Options) error
 }
 
 // Execute runs the plugin root command with the real process environment.
@@ -24,45 +25,38 @@ func NewRootCommand(opts Options) *cobra.Command {
 	if opts.Version == "" {
 		opts.Version = "dev"
 	}
+	if opts.UpgradeRunner == nil {
+		opts.UpgradeRunner = upgrade.Run
+	}
+
+	var nightly bool
 
 	cmd := &cobra.Command{
 		Use:           "entire-upgrade",
-		Short:         "Upgrade external command plugin for the Entire CLI",
+		Short:         "Upgrade the system-installed Entire CLI",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Long: `entire-upgrade is a minimal, testable external-command
-plugin for the Entire CLI.
+		Long: `entire-upgrade upgrades the Entire CLI binary that is currently on PATH.
 
-It demonstrates the binary naming convention, parent-provided environment, and
-per-plugin durable data directory used by Entire external commands.`,
+It detects whether Entire was installed with Homebrew, install.sh, or go install,
+checks the selected release channel, and runs the matching updater only when a
+newer build is available.
+
+Examples:
+  entire upgrade
+  entire upgrade --nightly`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runStatus(cmd, opts)
+			return opts.UpgradeRunner(cmd.Context(), upgrade.Options{
+				Channel: upgrade.ChannelFromNightlyFlag(nightly),
+				Stdout:  cmd.OutOrStdout(),
+				Stderr:  cmd.ErrOrStderr(),
+			})
 		},
 	}
 
+	cmd.Flags().BoolVar(&nightly, "nightly", false, "upgrade to the latest nightly build")
 	cmd.AddCommand(newDoctorCommand(opts.Env))
 	cmd.AddCommand(newConfigCommand(opts.Env))
 	cmd.AddCommand(newVersionCommand(opts.Version))
 	return cmd
-}
-
-func runStatus(cmd *cobra.Command, opts Options) error {
-	out := cmd.OutOrStdout()
-	fmt.Fprintln(out, "entire-upgrade")
-	fmt.Fprintf(out, "version: %s\n", opts.Version)
-	fmt.Fprintf(out, "entire cli: %s\n", valueOrUnset(opts.Env.CLIVersion))
-	fmt.Fprintf(out, "repo root: %s\n", valueOrUnset(opts.Env.RepoRoot))
-	fmt.Fprintf(out, "plugin data: %s\n", valueOrUnset(opts.Env.PluginDataDir))
-
-	if opts.Env.PluginDataDir == "" {
-		fmt.Fprintln(out, "greeting: <unavailable until ENTIRE_PLUGIN_DATA_DIR is set>")
-		return nil
-	}
-
-	cfg, err := config.Load(opts.Env.PluginDataDir)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "greeting: %s\n", cfg.Greeting)
-	return nil
 }

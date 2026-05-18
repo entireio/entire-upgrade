@@ -2,10 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
-	"github.com/entireio/entire-upgrade/internal/config"
+	"github.com/entireio/entire-upgrade/internal/upgrade"
 	"github.com/spf13/cobra"
 )
 
@@ -20,46 +21,41 @@ func execute(t *testing.T, cmd *cobra.Command, args ...string) (string, error) {
 	return stdout.String(), err
 }
 
-func TestRootStatusShowsEntireEnvironment(t *testing.T) {
-	dataDir := t.TempDir()
-	if err := config.Save(dataDir, config.Config{Greeting: "hello test"}); err != nil {
-		t.Fatalf("save config: %v", err)
-	}
-
+func TestRootUpgradeDefaultsToStable(t *testing.T) {
+	var got upgrade.Channel
 	cmd := NewRootCommand(Options{
 		Version: "test-version",
-		Env: EntireEnv{
-			CLIVersion:    "cli-test",
-			RepoRoot:      "/tmp/repo",
-			PluginDataDir: dataDir,
+		UpgradeRunner: func(_ context.Context, opts upgrade.Options) error {
+			got = opts.Channel
+			return nil
 		},
 	})
 
 	out, err := execute(t, cmd)
 	if err != nil {
-		t.Fatalf("execute root: %v", err)
+		t.Fatalf("execute root: %v\n%s", err, out)
 	}
-	for _, want := range []string{
-		"version: test-version",
-		"entire cli: cli-test",
-		"repo root: /tmp/repo",
-		"plugin data: " + dataDir,
-		"greeting: hello test",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("root output missing %q:\n%s", want, out)
-		}
+	if got != upgrade.StableChannel {
+		t.Fatalf("channel = %s, want %s", got, upgrade.StableChannel)
 	}
 }
 
-func TestRootStatusWorksWithoutEntireEnvironment(t *testing.T) {
-	cmd := NewRootCommand(Options{Version: "test-version"})
-	out, err := execute(t, cmd)
+func TestRootUpgradeNightlyFlag(t *testing.T) {
+	var got upgrade.Channel
+	cmd := NewRootCommand(Options{
+		Version: "test-version",
+		UpgradeRunner: func(_ context.Context, opts upgrade.Options) error {
+			got = opts.Channel
+			return nil
+		},
+	})
+
+	out, err := execute(t, cmd, "--nightly")
 	if err != nil {
-		t.Fatalf("execute root: %v", err)
+		t.Fatalf("execute root: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "plugin data: <unset>") {
-		t.Fatalf("root output missing unset plugin data:\n%s", out)
+	if got != upgrade.NightlyChannel {
+		t.Fatalf("channel = %s, want %s", got, upgrade.NightlyChannel)
 	}
 }
 
