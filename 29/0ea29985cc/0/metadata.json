@@ -1,0 +1,66 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "290ea29985cc",
+  "session_id": "019e3c4d-ebdf-7ac3-a928-ba4f67da5810",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-18T19:42:36.85785Z",
+  "branch": "codex/entire-upgrade-plugin",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "internal/cli/config.go",
+    "internal/cli/doctor.go",
+    "internal/cli/root.go",
+    "internal/cli/root_test.go",
+    "internal/cli/version.go",
+    "internal/upgrade/install_test.go",
+    "internal/upgrade/release.go",
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go",
+    "internal/upgrade/version.go",
+    "internal/upgrade/version_test.go"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "165e8ded5824",
+  "checkpoint_transcript_start": 188,
+  "transcript_lines_at_start": 188,
+  "token_usage": {
+    "input_tokens": 131064,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2535936,
+    "output_tokens": 15671,
+    "api_call_count": 33
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-05-18T19:42:36.828647Z",
+    "agent_lines": 271,
+    "agent_removed": 29,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 271,
+    "total_lines_changed": 300,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 271,
+      "agent_lines_removed": 29
+    }
+  ]
+}
