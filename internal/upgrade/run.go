@@ -152,7 +152,7 @@ func installWithHomebrew(ctx context.Context, runner Runner, install Installatio
 }
 
 func installWithCurl(ctx context.Context, runner Runner, channel Channel) error {
-	command := "curl -fsSL https://entire.io/install.sh | bash -s -- --channel " + string(channel)
+	command := "set -o pipefail; curl -fsSL https://entire.io/install.sh | bash -s -- --channel " + string(channel)
 	if err := runner.Run(ctx, "bash", "-c", command); err != nil {
 		return fmt.Errorf("install.sh %s install: %w", channel, err)
 	}

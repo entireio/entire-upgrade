@@ -115,7 +115,7 @@ func TestInstallCommands(t *testing.T) {
 			install: Installation{Method: MethodCurl},
 			channel: NightlyChannel,
 			want: []string{
-				"bash -c curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly",
+				"bash -c set -o pipefail; curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly",
 			},
 		},
 		{

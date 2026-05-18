@@ -101,7 +101,7 @@ func TestRunWithFakeCurlInstall(t *testing.T) {
 	h.runUpgrade(t, NightlyChannel)
 	h.assertInstalledVersion(t, fakeNightlyVersion)
 	h.assertLogContains(t,
-		"bash -c curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly",
+		"bash -c set -o pipefail; curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly",
 	)
 }
 
