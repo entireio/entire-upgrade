@@ -18,6 +18,7 @@ const defaultReleaseFetchTimeout = 30 * time.Second
 const githubReleasePageSize = 100
 const githubUserAgent = "entire-upgrade"
 const maxErrorBodyBytes = 4096
+const maxReleaseJSONBytes = 4 << 20
 
 type ReleaseChecker struct {
 	BaseURL string
@@ -115,7 +116,7 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 		}
 		return fmt.Errorf("fetch Entire CLI releases: GitHub returned %s", resp.Status)
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxReleaseJSONBytes)).Decode(out); err != nil {
 		return fmt.Errorf("decode Entire CLI release response: %w", err)
 	}
 	return nil
