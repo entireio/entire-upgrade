@@ -19,6 +19,29 @@ OS/Arch: darwin/amd64`
 	}
 }
 
+func TestParseVersionFromEntireOutputIgnoresGoRuntimeVersion(t *testing.T) {
+	out := `Go version: go1.26.2
+OS/Arch: darwin/amd64
+Entire CLI 0.6.1 (abcdef0)`
+
+	got, err := ParseVersion(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.6.1" {
+		t.Fatalf("version = %q, want 0.6.1", got)
+	}
+}
+
+func TestParseVersionRejectsOutputWithoutEntireVersion(t *testing.T) {
+	out := `Go version: go1.26.2
+OS/Arch: darwin/amd64`
+
+	if _, err := ParseVersion(out); err == nil {
+		t.Fatal("expected output without an Entire CLI version to fail")
+	}
+}
+
 func TestVersionCompare(t *testing.T) {
 	tests := []struct {
 		name string

@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 const defaultGitHubAPIBase = "https://api.github.com/repos/entireio/cli"
 const githubAPIBaseEnv = "ENTIRE_UPGRADE_GITHUB_API_BASE_URL"
+const defaultReleaseFetchTimeout = 30 * time.Second
 
 type ReleaseChecker struct {
 	BaseURL string
@@ -78,7 +80,7 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 	}
 	client := c.Client
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: defaultReleaseFetchTimeout}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)

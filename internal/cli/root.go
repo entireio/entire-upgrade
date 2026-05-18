@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 
 	"github.com/entireio/entire-upgrade/internal/upgrade"
 	"github.com/spf13/cobra"
@@ -30,10 +31,12 @@ func NewRootCommand(opts Options) *cobra.Command {
 	}
 
 	var nightly bool
+	var stable bool
 
 	cmd := &cobra.Command{
 		Use:           "entire-upgrade",
 		Short:         "Upgrade the system-installed Entire CLI",
+		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Long: `entire-upgrade upgrades the Entire CLI binary that is currently on PATH.
@@ -44,16 +47,30 @@ newer build is available.
 
 Examples:
   entire upgrade
+  entire upgrade --stable
   entire upgrade --nightly`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if stable && nightly {
+				return errors.New("--stable and --nightly cannot be used together")
+			}
+
+			channel := upgrade.StableChannel
+			explicitChannel := stable
+			if nightly {
+				channel = upgrade.NightlyChannel
+				explicitChannel = true
+			}
+
 			return opts.UpgradeRunner(cmd.Context(), upgrade.Options{
-				Channel: upgrade.ChannelFromNightlyFlag(nightly),
-				Stdout:  cmd.OutOrStdout(),
-				Stderr:  cmd.ErrOrStderr(),
+				Channel:         channel,
+				ExplicitChannel: explicitChannel,
+				Stdout:          cmd.OutOrStdout(),
+				Stderr:          cmd.ErrOrStderr(),
 			})
 		},
 	}
 
+	cmd.Flags().BoolVar(&stable, "stable", false, "switch back to the latest stable build")
 	cmd.Flags().BoolVar(&nightly, "nightly", false, "upgrade to the latest nightly build")
 	cmd.AddCommand(newDoctorCommand(opts.Env))
 	cmd.AddCommand(newConfigCommand(opts.Env))

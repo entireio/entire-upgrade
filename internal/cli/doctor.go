@@ -12,6 +12,7 @@ func newDoctorCommand(env EntireEnv) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check the parent Entire CLI plugin environment",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDoctor(cmd, env)
 		},

@@ -56,6 +56,39 @@ func TestRunWithFakeHomebrewInstall(t *testing.T) {
 	)
 }
 
+func TestRunExplicitStableSwitchesFakeHomebrewInstall(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Homebrew path detection depends on Unix-style cask symlinks")
+	}
+
+	h := newFakeHarness(t)
+	brewPrefix := filepath.Join(h.dir, "homebrew")
+	h.setBrewPrefix(brewPrefix)
+	if err := os.WriteFile(h.version, []byte(fakeNightlyVersion), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	caskBin := filepath.Join(brewPrefix, "Caskroom", "entire@nightly", fakeNightlyVersion, "entire")
+	h.installFakeCommandAt(caskBin)
+	if err := os.MkdirAll(filepath.Join(brewPrefix, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pathBin := filepath.Join(brewPrefix, "bin", "entire")
+	if err := os.Symlink(caskBin, pathBin); err != nil {
+		t.Fatal(err)
+	}
+	h.prependPath(filepath.Join(brewPrefix, "bin"), h.bin)
+
+	h.runUpgradeWithOptions(t, Options{Channel: StableChannel, ExplicitChannel: true})
+	h.assertInstalledVersion(t, fakeStableVersion)
+	h.assertLogContains(t,
+		"brew tap entireio/tap",
+		"brew update",
+		"brew uninstall --cask entire@nightly",
+		"brew install --cask entire",
+	)
+}
+
 func TestRunWithFakeCurlInstall(t *testing.T) {
 	h := newFakeHarness(t)
 	home := filepath.Join(h.dir, "home")
@@ -185,13 +218,16 @@ func (h *fakeHarness) prependPath(dirs ...string) {
 
 func (h *fakeHarness) runUpgrade(t *testing.T, channel Channel) {
 	t.Helper()
+	h.runUpgradeWithOptions(t, Options{Channel: channel})
+}
+
+func (h *fakeHarness) runUpgradeWithOptions(t *testing.T, opts Options) {
+	t.Helper()
 
 	var out bytes.Buffer
-	if err := Run(context.Background(), Options{
-		Channel: channel,
-		Stdout:  &out,
-		Stderr:  &out,
-	}); err != nil {
+	opts.Stdout = &out
+	opts.Stderr = &out
+	if err := Run(context.Background(), opts); err != nil {
 		t.Fatalf("Run() error = %v\noutput:\n%s\nlog:\n%s", err, out.String(), h.readLog(t))
 	}
 	if !strings.Contains(out.String(), "Entire CLI upgrade complete") {
@@ -347,18 +383,73 @@ func fakeBash(stateDir string, args []string) int {
 }
 
 func fakeSetVersionForCask(stateDir, cask string) error {
+	channel := StableChannel
 	if cask == "entire@nightly" {
-		return fakeSetVersionForChannel(stateDir, NightlyChannel)
+		channel = NightlyChannel
 	}
-	return fakeSetVersionForChannel(stateDir, StableChannel)
+	if err := fakeSetVersionForChannel(stateDir, channel); err != nil {
+		return err
+	}
+	return fakeInstallBrewCask(cask, fakeVersionForChannel(channel))
 }
 
 func fakeSetVersionForChannel(stateDir string, channel Channel) error {
-	version := os.Getenv("ENTIRE_UPGRADE_FAKE_STABLE_VERSION")
+	return os.WriteFile(filepath.Join(stateDir, "version.txt"), []byte(fakeVersionForChannel(channel)), 0o644)
+}
+
+func fakeVersionForChannel(channel Channel) string {
 	if channel == NightlyChannel {
-		version = os.Getenv("ENTIRE_UPGRADE_FAKE_NIGHTLY_VERSION")
+		return os.Getenv("ENTIRE_UPGRADE_FAKE_NIGHTLY_VERSION")
 	}
-	return os.WriteFile(filepath.Join(stateDir, "version.txt"), []byte(version), 0o644)
+	return os.Getenv("ENTIRE_UPGRADE_FAKE_STABLE_VERSION")
+}
+
+func fakeInstallBrewCask(cask, version string) error {
+	prefix := os.Getenv("ENTIRE_UPGRADE_FAKE_BREW_PREFIX")
+	if prefix == "" {
+		return nil
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	caskBin := filepath.Join(prefix, "Caskroom", cask, version, commandFilename("entire"))
+	if err := copyFakeCommand(executable, caskBin); err != nil {
+		return err
+	}
+
+	pathBin := filepath.Join(prefix, "bin", commandFilename("entire"))
+	if err := os.MkdirAll(filepath.Dir(pathBin), 0o755); err != nil {
+		return err
+	}
+	if err := os.Remove(pathBin); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.Symlink(caskBin, pathBin)
+}
+
+func copyFakeCommand(srcPath, dstPath string) error {
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return err
+	}
+
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(dstPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		return err
+	}
+	return dst.Close()
 }
 
 func appendFakeLog(stateDir, name string, args []string) error {

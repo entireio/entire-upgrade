@@ -100,6 +100,17 @@ func TestInstallCommands(t *testing.T) {
 			},
 		},
 		{
+			name:    "homebrew switches back to stable cask",
+			install: Installation{Method: MethodHomebrew, BrewCask: "entire@nightly"},
+			channel: StableChannel,
+			want: []string{
+				"brew tap entireio/tap",
+				"brew update",
+				"brew uninstall --cask entire@nightly",
+				"brew install --cask entire",
+			},
+		},
+		{
 			name:    "curl uses selected channel",
 			install: Installation{Method: MethodCurl},
 			channel: NightlyChannel,

@@ -18,6 +18,7 @@ func newConfigCommand(env EntireEnv) *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "path",
 		Short: "Print the plugin config path",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := configPath(env)
 			if err != nil {
@@ -31,6 +32,7 @@ func newConfigCommand(env EntireEnv) *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "show",
 		Short: "Print plugin configuration as JSON",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dataDir, err := requireDataDir(env)
 			if err != nil {
@@ -52,6 +54,7 @@ func newConfigCommand(env EntireEnv) *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "init",
 		Short: "Write the default plugin configuration",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dataDir, err := requireDataDir(env)
 			if err != nil {

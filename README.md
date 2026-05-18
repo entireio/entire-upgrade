@@ -21,6 +21,13 @@ into the latest nightly build:
 entire upgrade --nightly
 ```
 
+If you are running a nightly build and want to move back to the latest stable
+release, use:
+
+```sh
+entire upgrade --stable
+```
+
 The plugin detects whether the active `entire` binary was installed through
 Homebrew, `install.sh`, or `go install`, then runs the matching updater.
 

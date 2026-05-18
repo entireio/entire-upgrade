@@ -10,9 +10,10 @@ import (
 )
 
 type Options struct {
-	Channel Channel
-	Stdout  io.Writer
-	Stderr  io.Writer
+	Channel         Channel
+	ExplicitChannel bool
+	Stdout          io.Writer
+	Stderr          io.Writer
 }
 
 type Runner interface {
@@ -58,12 +59,18 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	fmt.Fprintf(stdout, "Latest %s build is %s\n", channel, latest)
 
-	if latest.Compare(install.Version) <= 0 {
+	compare := latest.Compare(install.Version)
+	channelSwitch := opts.ExplicitChannel && !installationMatchesChannel(install, channel)
+	if compare <= 0 && !channelSwitch {
 		fmt.Fprintf(stdout, "Entire CLI is already up to date for the %s channel.\n", channel)
 		return nil
 	}
 
-	fmt.Fprintf(stdout, "Upgrading Entire CLI from %s to %s...\n", install.Version, latest)
+	action := "Upgrading"
+	if compare < 0 || channelSwitch {
+		action = "Switching"
+	}
+	fmt.Fprintf(stdout, "%s Entire CLI from %s to %s...\n", action, install.Version, latest)
 	if err := Install(ctx, ExecRunner{Stdout: stdout, Stderr: stderr}, install, latest, channel); err != nil {
 		return err
 	}
@@ -75,9 +82,31 @@ func Run(ctx context.Context, opts Options) error {
 	if verified.Version.Compare(latest) < 0 {
 		return fmt.Errorf("upgrade command completed, but Entire CLI still reports %s; expected at least %s", verified.Version, latest)
 	}
+	if !installationMatchesChannel(verified, channel) {
+		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
+	}
 
 	fmt.Fprintf(stdout, "Entire CLI upgrade complete. Now running %s.\n", verified.Version)
 	return nil
+}
+
+func installationMatchesChannel(install Installation, channel Channel) bool {
+	return installedChannel(install) == channel
+}
+
+func installedChannel(install Installation) Channel {
+	if install.Method == MethodHomebrew {
+		switch install.BrewCask {
+		case "entire@nightly":
+			return NightlyChannel
+		case "entire":
+			return StableChannel
+		}
+	}
+	if install.Version.IsNightly() {
+		return NightlyChannel
+	}
+	return StableChannel
 }
 
 func Install(ctx context.Context, runner Runner, install Installation, target Version, channel Channel) error {

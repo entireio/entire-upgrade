@@ -22,11 +22,11 @@ func execute(t *testing.T, cmd *cobra.Command, args ...string) (string, error) {
 }
 
 func TestRootUpgradeDefaultsToStable(t *testing.T) {
-	var got upgrade.Channel
+	var got upgrade.Options
 	cmd := NewRootCommand(Options{
 		Version: "test-version",
 		UpgradeRunner: func(_ context.Context, opts upgrade.Options) error {
-			got = opts.Channel
+			got = opts
 			return nil
 		},
 	})
@@ -35,17 +35,20 @@ func TestRootUpgradeDefaultsToStable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute root: %v\n%s", err, out)
 	}
-	if got != upgrade.StableChannel {
-		t.Fatalf("channel = %s, want %s", got, upgrade.StableChannel)
+	if got.Channel != upgrade.StableChannel {
+		t.Fatalf("channel = %s, want %s", got.Channel, upgrade.StableChannel)
+	}
+	if got.ExplicitChannel {
+		t.Fatal("default stable channel should not be explicit")
 	}
 }
 
 func TestRootUpgradeNightlyFlag(t *testing.T) {
-	var got upgrade.Channel
+	var got upgrade.Options
 	cmd := NewRootCommand(Options{
 		Version: "test-version",
 		UpgradeRunner: func(_ context.Context, opts upgrade.Options) error {
-			got = opts.Channel
+			got = opts
 			return nil
 		},
 	})
@@ -54,8 +57,51 @@ func TestRootUpgradeNightlyFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute root: %v\n%s", err, out)
 	}
-	if got != upgrade.NightlyChannel {
-		t.Fatalf("channel = %s, want %s", got, upgrade.NightlyChannel)
+	if got.Channel != upgrade.NightlyChannel {
+		t.Fatalf("channel = %s, want %s", got.Channel, upgrade.NightlyChannel)
+	}
+	if !got.ExplicitChannel {
+		t.Fatal("nightly flag did not mark channel explicit")
+	}
+}
+
+func TestRootUpgradeStableFlag(t *testing.T) {
+	var got upgrade.Options
+	cmd := NewRootCommand(Options{
+		Version: "test-version",
+		UpgradeRunner: func(_ context.Context, opts upgrade.Options) error {
+			got = opts
+			return nil
+		},
+	})
+
+	out, err := execute(t, cmd, "--stable")
+	if err != nil {
+		t.Fatalf("execute root: %v\n%s", err, out)
+	}
+	if got.Channel != upgrade.StableChannel {
+		t.Fatalf("channel = %s, want %s", got.Channel, upgrade.StableChannel)
+	}
+	if !got.ExplicitChannel {
+		t.Fatal("stable flag did not mark channel explicit")
+	}
+}
+
+func TestRootUpgradeRejectsConflictingChannelFlags(t *testing.T) {
+	cmd := NewRootCommand(Options{Version: "test-version"})
+
+	out, err := execute(t, cmd, "--stable", "--nightly")
+	if err == nil {
+		t.Fatalf("expected conflicting flags to fail\n%s", out)
+	}
+}
+
+func TestRootUpgradeRejectsPositionalArgs(t *testing.T) {
+	cmd := NewRootCommand(Options{Version: "test-version"})
+
+	out, err := execute(t, cmd, "stable")
+	if err == nil {
+		t.Fatalf("expected positional args to fail\n%s", out)
 	}
 }
 

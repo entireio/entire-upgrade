@@ -23,14 +23,25 @@ type Version struct {
 	Present bool
 }
 
-var versionRE = regexp.MustCompile(`v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?`)
+const versionPattern = `([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?`
+
+var (
+	exactVersionRE      = regexp.MustCompile(`^v?` + versionPattern + `$`)
+	entireVersionLineRE = regexp.MustCompile(`(?m)^(?:Entire CLI|entire)\s+v?` + versionPattern + `(?:\s|$)`)
+)
 
 func ParseVersion(s string) (Version, error) {
-	match := versionRE.FindStringSubmatch(s)
+	match := exactVersionRE.FindStringSubmatch(strings.TrimSpace(s))
+	if match == nil {
+		match = entireVersionLineRE.FindStringSubmatch(s)
+	}
 	if match == nil {
 		return Version{}, fmt.Errorf("could not parse version from %q", s)
 	}
+	return parseVersionMatch(match)
+}
 
+func parseVersionMatch(match []string) (Version, error) {
 	major, err := strconv.Atoi(match[1])
 	if err != nil {
 		return Version{}, fmt.Errorf("parse major version: %w", err)
