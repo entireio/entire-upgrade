@@ -1,9 +1,9 @@
 {
-  "name": "entire-plugin-template",
+  "name": "entire-upgrade",
   "build": { "dockerfile": "Dockerfile" },
   "remoteUser": "vscode",
   "mounts": [
-    "source=entire-plugin-template-gocache,target=/home/vscode/go,type=volume"
+    "source=entire-upgrade-gocache,target=/home/vscode/go,type=volume"
   ],
   "postCreateCommand": "go mod download && go build ./...",
   "customizations": {

@@ -1,4 +1,4 @@
-module github.com/entireio/entire-plugin-template
+module github.com/entireio/entire-upgrade
 
 go 1.26
 

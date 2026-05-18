@@ -1,6 +1,6 @@
-# entire-plugin-template
+# entire-upgrade
 
-A starter repository for Entire CLI external-command plugins. It is modeled
+An Entire CLI external-command plugin. It is modeled
 after `entire-sandbox`: Go + Cobra, `mise` tasks, CI, devcontainer support, and
 the `.codex` / `.entire` project config that Entire-enabled repos normally
 carry.
@@ -9,11 +9,10 @@ Entire external commands are plain executables named `entire-<name>` on `PATH`.
 When a user runs `entire <name>`, the parent CLI dispatches to that binary and
 passes the remaining arguments through unchanged.
 
-This template builds a sample plugin binary named `entire-plugin-template`,
-which is invoked as:
+This plugin builds a binary named `entire-upgrade`, which is invoked as:
 
 ```sh
-entire plugin-template
+entire upgrade
 ```
 
 ## Quick Start
@@ -23,39 +22,27 @@ mise install
 mise run test
 mise run build
 
-entire plugin install ./entire-plugin-template
-entire plugin-template doctor
+entire plugin install ./entire-upgrade
+entire upgrade doctor
 ```
 
 For local development without installing the binary, run it directly:
 
 ```sh
-go run ./cmd/entire-plugin-template
+go run ./cmd/entire-upgrade
 ```
 
 Some commands, such as `doctor` and `config`, expect to run through the Entire
 CLI so `ENTIRE_PLUGIN_DATA_DIR` is present. For standalone testing, set it:
 
 ```sh
-ENTIRE_PLUGIN_DATA_DIR="$(mktemp -d)" go run ./cmd/entire-plugin-template doctor
+ENTIRE_PLUGIN_DATA_DIR="$(mktemp -d)" go run ./cmd/entire-upgrade doctor
 ```
-
-## Rename This Template
-
-To turn the template into a real plugin:
-
-1. Pick a bare plugin name, for example `deploy`.
-2. Rename `cmd/entire-plugin-template` to `cmd/entire-deploy`.
-3. Replace `entire-plugin-template` in `mise.toml`, CI, README, and Go command
-   metadata.
-4. Update `go.mod` to your final module path.
-5. Keep the built executable name prefixed with `entire-`; the command becomes
-   `entire deploy`.
 
 ## Layout
 
 ```text
-cmd/entire-plugin-template/   Binary entry point
+cmd/entire-upgrade/           Binary entry point
 internal/cli/                 Cobra commands and Entire environment handling
 internal/config/              Small durable-state example
 mise-tasks/lint/              File-based mise lint tasks
@@ -93,6 +80,6 @@ mise run fmt        # gofmt -s -w .
 mise run lint       # go vet, gofmt check, go mod tidy check, shellcheck
 mise run test       # go test ./...
 mise run test:ci    # go test -race ./...
-mise run build      # build ./entire-plugin-template
+mise run build      # build ./entire-upgrade
 mise run build-all  # cross-build common Entire targets
 ```
