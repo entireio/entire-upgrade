@@ -1,5 +1,1 @@
-Do an adversarial review of the code in this report
-
----
-
-Sorry, I mean repo
+Push the dirty workflow diff. Then fix all findings. For the high finding, add an option —stable to go back to the stable release.
