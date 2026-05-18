@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,7 @@ const githubAPIBaseEnv = "ENTIRE_UPGRADE_GITHUB_API_BASE_URL"
 const defaultReleaseFetchTimeout = 30 * time.Second
 const githubReleasePageSize = 100
 const githubUserAgent = "entire-upgrade"
+const maxErrorBodyBytes = 4096
 
 type ReleaseChecker struct {
 	BaseURL string
@@ -107,6 +109,10 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
+		if message := strings.TrimSpace(string(body)); message != "" {
+			return fmt.Errorf("fetch Entire CLI releases: GitHub returned %s: %s", resp.Status, message)
+		}
 		return fmt.Errorf("fetch Entire CLI releases: GitHub returned %s", resp.Status)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

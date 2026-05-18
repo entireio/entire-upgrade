@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -97,5 +98,20 @@ func TestReleaseCheckerDoesNotSendTokenToOverrideBaseURL(t *testing.T) {
 
 	if _, err := (ReleaseChecker{BaseURL: server.URL}).Latest(context.Background(), StableChannel); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReleaseCheckerIncludesErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rate limited", http.StatusForbidden)
+	}))
+	defer server.Close()
+
+	_, err := (ReleaseChecker{BaseURL: server.URL}).Latest(context.Background(), StableChannel)
+	if err == nil {
+		t.Fatal("expected release lookup to fail")
+	}
+	if !strings.Contains(err.Error(), "rate limited") {
+		t.Fatalf("error = %q, want response body", err)
 	}
 }
