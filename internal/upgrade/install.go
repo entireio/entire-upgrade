@@ -45,7 +45,7 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 
 	versionOut, err := exec.CommandContext(ctx, binaryPath, "--version").CombinedOutput()
 	if err != nil {
-		return Installation{}, fmt.Errorf("failed to read installed Entire CLI version: %w", err)
+		return Installation{}, versionCommandError(err, versionOut)
 	}
 	version, err := ParseVersion(string(versionOut))
 	if err != nil {
@@ -66,6 +66,14 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 	}
 	install.Version = version
 	return install, nil
+}
+
+func versionCommandError(err error, output []byte) error {
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		return fmt.Errorf("failed to read installed Entire CLI version: %w", err)
+	}
+	return fmt.Errorf("failed to read installed Entire CLI version: %w: %s", err, message)
 }
 
 func ClassifyInstallation(binaryPath, resolvedPath string, env Environment) (Installation, bool) {
