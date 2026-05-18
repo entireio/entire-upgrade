@@ -17,7 +17,7 @@ func TestReleaseCheckerLatestStable(t *testing.T) {
 	}))
 	defer server.Close()
 
-	got, err := (ReleaseChecker{BaseURL: server.URL}).Latest(context.Background(), StableChannel)
+	got, err := (ReleaseChecker{BaseURL: server.URL + "/"}).Latest(context.Background(), StableChannel)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -81,6 +82,7 @@ func (c ReleaseChecker) fetchJSON(ctx context.Context, path string, out any) err
 	if base == "" {
 		base = defaultGitHubAPIBase
 	}
+	base = strings.TrimRight(base, "/")
 	client := c.Client
 	if client == nil {
 		client = &http.Client{Timeout: defaultReleaseFetchTimeout}
