@@ -30,7 +30,19 @@ func (r ExecRunner) Run(ctx context.Context, name string, args ...string) error 
 	cmd.Stdout = r.Stdout
 	cmd.Stderr = r.Stderr
 	cmd.Stdin = os.Stdin
+	cmd.Env = commandEnvWithoutGitHubToken(os.Environ())
 	return cmd.Run()
+}
+
+func commandEnvWithoutGitHubToken(env []string) []string {
+	filtered := env[:0]
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "GITHUB_TOKEN=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func Run(ctx context.Context, opts Options) error {

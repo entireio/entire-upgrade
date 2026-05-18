@@ -163,6 +163,18 @@ func TestInstallRejectsEmptyGoTarget(t *testing.T) {
 	}
 }
 
+func TestCommandEnvWithoutGitHubToken(t *testing.T) {
+	got := commandEnvWithoutGitHubToken([]string{
+		"PATH=/bin",
+		"GITHUB_TOKEN=secret",
+		"HOME=/tmp/home",
+	})
+	want := []string{"PATH=/bin", "HOME=/tmp/home"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("env = %#v, want %#v", got, want)
+	}
+}
+
 type recordRunner struct {
 	commands []string
 }
