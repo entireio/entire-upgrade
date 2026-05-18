@@ -149,17 +149,26 @@ func pathAliases(path string) []string {
 
 func goBinDirs(env Environment) []string {
 	var dirs []string
+	seen := map[string]struct{}{}
+	addDir := func(dir string) {
+		dir = filepath.Clean(dir)
+		if _, ok := seen[dir]; ok {
+			return
+		}
+		seen[dir] = struct{}{}
+		dirs = append(dirs, dir)
+	}
 	if env.GoBin != "" {
-		dirs = append(dirs, env.GoBin)
+		addDir(env.GoBin)
 	}
 	if env.GoPath == "" && env.Home != "" {
-		dirs = append(dirs, filepath.Join(env.Home, "go", "bin"))
+		addDir(filepath.Join(env.Home, "go", "bin"))
 	}
 	for _, p := range filepath.SplitList(env.GoPath) {
 		if p == "" {
 			continue
 		}
-		dirs = append(dirs, filepath.Join(p, "bin"))
+		addDir(filepath.Join(p, "bin"))
 	}
 	return dirs
 }

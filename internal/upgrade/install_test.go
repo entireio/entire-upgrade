@@ -76,6 +76,20 @@ func TestClassifyInstallation(t *testing.T) {
 	}
 }
 
+func TestGoBinDirsDeduplicates(t *testing.T) {
+	home := filepath.Join(string(filepath.Separator), "Users", "tester")
+	goPath := filepath.Join(home, "go")
+	got := goBinDirs(Environment{
+		Home:   home,
+		GoBin:  filepath.Join(goPath, "bin"),
+		GoPath: goPath,
+	})
+	want := []string{filepath.Join(goPath, "bin")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dirs = %#v, want %#v", got, want)
+	}
+}
+
 func TestInstallCommands(t *testing.T) {
 	target := mustVersion(t, "0.6.2-nightly.202605160654.ddf1a331")
 
