@@ -12,6 +12,7 @@ import (
 const defaultGitHubAPIBase = "https://api.github.com/repos/entireio/cli"
 const githubAPIBaseEnv = "ENTIRE_UPGRADE_GITHUB_API_BASE_URL"
 const defaultReleaseFetchTimeout = 30 * time.Second
+const githubReleasePageSize = 100
 
 type ReleaseChecker struct {
 	BaseURL string
@@ -43,21 +44,27 @@ func (c ReleaseChecker) latestStable(ctx context.Context) (Version, error) {
 }
 
 func (c ReleaseChecker) latestNightly(ctx context.Context) (Version, error) {
-	var releases []struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := c.fetchJSON(ctx, "/releases?per_page=100", &releases); err != nil {
-		return Version{}, err
-	}
-
 	var latest Version
-	for _, release := range releases {
-		version, err := ParseVersion(release.TagName)
-		if err != nil || !version.IsNightly() {
-			continue
+	for page := 1; ; page++ {
+		var releases []struct {
+			TagName string `json:"tag_name"`
 		}
-		if !latest.Present || version.Compare(latest) > 0 {
-			latest = version
+		path := fmt.Sprintf("/releases?per_page=%d&page=%d", githubReleasePageSize, page)
+		if err := c.fetchJSON(ctx, path, &releases); err != nil {
+			return Version{}, err
+		}
+
+		for _, release := range releases {
+			version, err := ParseVersion(release.TagName)
+			if err != nil || !version.IsNightly() {
+				continue
+			}
+			if !latest.Present || version.Compare(latest) > 0 {
+				latest = version
+			}
+		}
+		if len(releases) < githubReleasePageSize {
+			break
 		}
 	}
 	if !latest.Present {

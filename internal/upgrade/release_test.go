@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,8 +28,8 @@ func TestReleaseCheckerLatestStable(t *testing.T) {
 
 func TestReleaseCheckerLatestNightlyChoosesNewest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/releases" || r.URL.Query().Get("per_page") != "100" {
-			t.Fatalf("url = %s, want /releases?per_page=100", r.URL.String())
+		if r.URL.Path != "/releases" || r.URL.Query().Get("per_page") != "100" || r.URL.Query().Get("page") != "1" {
+			t.Fatalf("url = %s, want /releases?per_page=100&page=1", r.URL.String())
 		}
 		_, _ = w.Write([]byte(`[
 			{"tag_name":"v0.6.1"},
@@ -36,6 +37,38 @@ func TestReleaseCheckerLatestNightlyChoosesNewest(t *testing.T) {
 			{"tag_name":"v0.6.2-nightly.202605150717.11da3db0"},
 			{"tag_name":"v0.6.2-nightly.202605160654.ddf1a331"}
 		]`))
+	}))
+	defer server.Close()
+
+	got, err := (ReleaseChecker{BaseURL: server.URL}).Latest(context.Background(), NightlyChannel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.6.2-nightly.202605160654.ddf1a331" {
+		t.Fatalf("latest nightly = %s", got)
+	}
+}
+
+func TestReleaseCheckerLatestNightlyPaginates(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/releases" || r.URL.Query().Get("per_page") != "100" {
+			t.Fatalf("url = %s, want /releases?per_page=100", r.URL.String())
+		}
+		switch r.URL.Query().Get("page") {
+		case "1":
+			fmt.Fprint(w, `[`)
+			for i := 0; i < githubReleasePageSize; i++ {
+				if i > 0 {
+					fmt.Fprint(w, `,`)
+				}
+				fmt.Fprintf(w, `{"tag_name":"v0.%d.0"}`, i)
+			}
+			fmt.Fprint(w, `]`)
+		case "2":
+			_, _ = w.Write([]byte(`[{"tag_name":"v0.6.2-nightly.202605160654.ddf1a331"}]`))
+		default:
+			t.Fatalf("unexpected page %q", r.URL.Query().Get("page"))
+		}
 	}))
 	defer server.Close()
 
