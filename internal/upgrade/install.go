@@ -91,18 +91,18 @@ func ClassifyInstallation(binaryPath, resolvedPath string, env Environment) (Ins
 		return install, true
 	}
 
-	if env.Home != "" {
-		curlPath := filepath.Join(env.Home, ".local", "bin", executableName("entire"))
-		if samePath(binaryPath, curlPath) || samePath(resolvedPath, curlPath) {
-			install.Method = MethodCurl
-			return install, true
-		}
-	}
-
 	for _, dir := range goBinDirs(env) {
 		goPath := filepath.Join(dir, executableName("entire"))
 		if samePath(binaryPath, goPath) || samePath(resolvedPath, goPath) {
 			install.Method = MethodGo
+			return install, true
+		}
+	}
+
+	if env.Home != "" {
+		curlPath := filepath.Join(env.Home, ".local", "bin", executableName("entire"))
+		if samePath(binaryPath, curlPath) || samePath(resolvedPath, curlPath) {
+			install.Method = MethodCurl
 			return install, true
 		}
 	}

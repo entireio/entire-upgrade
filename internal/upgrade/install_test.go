@@ -52,6 +52,12 @@ func TestClassifyInstallation(t *testing.T) {
 			resolved: filepath.Join(goPath, "bin", exe),
 			method:   MethodGo,
 		},
+		{
+			name:     "go install symlinked from local bin",
+			path:     filepath.Join(home, ".local", "bin", exe),
+			resolved: filepath.Join(goPath, "bin", exe),
+			method:   MethodGo,
+		},
 	}
 
 	for _, tt := range tests {
