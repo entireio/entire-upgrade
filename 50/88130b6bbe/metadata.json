@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "5088130b6bbe",
+  "strategy": "manual-commit",
+  "branch": "codex/entire-upgrade-plugin",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "internal/upgrade/release.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/50/88130b6bbe/0/metadata.json",
+      "transcript": "/50/88130b6bbe/0/full.jsonl",
+      "content_hash": "/50/88130b6bbe/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1077,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 371840,
+    "output_tokens": 399,
+    "api_call_count": 3
+  }
+}
