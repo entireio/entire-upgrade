@@ -20,9 +20,6 @@ on:
       - "go.sum"
   workflow_dispatch:
 
-env:
-  GITHUB_TOKEN: ${{ github.token }}
-
 jobs:
   homebrew:
     name: Homebrew install path
