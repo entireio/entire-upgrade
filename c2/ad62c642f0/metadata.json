@@ -3,7 +3,7 @@
   "checkpoint_id": "c2ad62c642f0",
   "strategy": "manual-commit",
   "branch": "codex/entire-upgrade-plugin",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     ".github/workflows/test.yml",
     ".github/workflows/upgrade-smoke.yml"
@@ -14,13 +14,19 @@
       "transcript": "/c2/ad62c642f0/0/full.jsonl",
       "content_hash": "/c2/ad62c642f0/0/content_hash.txt",
       "prompt": "/c2/ad62c642f0/0/prompt.txt"
+    },
+    {
+      "metadata": "/c2/ad62c642f0/1/metadata.json",
+      "transcript": "/c2/ad62c642f0/1/full.jsonl",
+      "content_hash": "/c2/ad62c642f0/1/content_hash.txt",
+      "prompt": "/c2/ad62c642f0/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 52464,
+    "input_tokens": 167620,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 867712,
-    "output_tokens": 7941,
-    "api_call_count": 21
+    "cache_read_tokens": 1939584,
+    "output_tokens": 19115,
+    "api_call_count": 45
   }
 }
