@@ -37,6 +37,7 @@ func runDoctor(cmd *cobra.Command, env EntireEnv) error {
 		return fmt.Errorf("write plugin data dir: %w", err)
 	}
 	name := f.Name()
+	defer os.Remove(name)
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("close write probe: %w", err)
 	}
