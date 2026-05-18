@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "fdf759580332",
+  "session_id": "019e38ce-3a0e-75a0-9131-9d9ac2a6a44b",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-18T05:30:17.902435Z",
+  "branch": "codex/entire-upgrade-plugin",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml",
+    "README.md",
+    "internal/cli/root.go",
+    "internal/cli/root_test.go",
+    "internal/upgrade/install.go",
+    "internal/upgrade/install_test.go",
+    "internal/upgrade/release.go",
+    "internal/upgrade/release_test.go",
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go",
+    "internal/upgrade/version.go",
+    "internal/upgrade/version_test.go"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "4742e3ecb3ea",
+  "token_usage": {
+    "input_tokens": 20848,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3456,
+    "output_tokens": 286,
+    "api_call_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-05-18T05:30:17.895522Z",
+    "agent_lines": 1413,
+    "agent_removed": 71,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1413,
+    "total_lines_changed": 1484,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 20,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".codex/hooks.json": 20
+      }
+    }
+  ]
+}

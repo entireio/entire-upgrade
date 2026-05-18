@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "fdf759580332",
+  "strategy": "manual-commit",
+  "branch": "codex/entire-upgrade-plugin",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml",
+    "README.md",
+    "internal/cli/root.go",
+    "internal/cli/root_test.go",
+    "internal/upgrade/install.go",
+    "internal/upgrade/install_test.go",
+    "internal/upgrade/release.go",
+    "internal/upgrade/release_test.go",
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go",
+    "internal/upgrade/version.go",
+    "internal/upgrade/version_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fd/f759580332/0/metadata.json",
+      "transcript": "/fd/f759580332/0/full.jsonl",
+      "content_hash": "/fd/f759580332/0/content_hash.txt",
+      "prompt": "/fd/f759580332/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 20848,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3456,
+    "output_tokens": 286,
+    "api_call_count": 1
+  }
+}
