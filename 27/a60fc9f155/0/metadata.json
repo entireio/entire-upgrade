@@ -1,0 +1,63 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "27a60fc9f155",
+  "session_id": "019e38d2-7b7c-7582-88b4-b452abba2edc",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-18T02:06:52.927176Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".devcontainer/devcontainer.json",
+    ".gitignore",
+    "README.md",
+    "cmd/entire-plugin-template/main.go",
+    "cmd/entire-upgrade/main.go",
+    "go.mod",
+    "internal/cli/config.go",
+    "internal/cli/doctor.go",
+    "internal/cli/root.go",
+    "internal/cli/root_test.go",
+    "mise.toml"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "2dc330367f12",
+  "token_usage": {
+    "input_tokens": 106225,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 755968,
+    "output_tokens": 7411,
+    "api_call_count": 23
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-05-18T02:06:52.914319Z",
+    "agent_lines": 45,
+    "agent_removed": 58,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 45,
+    "total_lines_changed": 103,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 45,
+      "agent_lines_removed": 58
+    }
+  ]
+}
