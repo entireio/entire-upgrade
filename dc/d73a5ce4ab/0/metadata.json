@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.6.2-nightly.202605160654.ddf1a331",
+  "checkpoint_id": "dcd73a5ce4ab",
+  "session_id": "019e40b8-f60c-7fd0-a289-c41e3c58fb25",
+  "strategy": "manual-commit",
+  "created_at": "2026-05-19T18:13:10.707915Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "267feb695c49",
+  "checkpoint_transcript_start": 382,
+  "transcript_lines_at_start": 382,
+  "token_usage": {
+    "input_tokens": 25756,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3781504,
+    "output_tokens": 3889,
+    "api_call_count": 21
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-05-19T18:13:10.661793Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
