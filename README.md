@@ -101,5 +101,5 @@ mise run build-all  # cross-build common Entire targets
 ## CI
 
 `.github/workflows/test.yml` runs lint, cross-builds, and tests on Linux,
-macOS, and Windows. `.github/workflows/upgrade-smoke.yml` runs macOS smoke
-tests against real Homebrew, `install.sh`, and `go install` install paths.
+macOS, and Windows. `.github/workflows/upgrade-smoke.yml` runs smoke tests
+against real Homebrew, `install.sh`, and `go install` install paths.
