@@ -2,10 +2,12 @@ package upgrade
 
 import (
 	"context"
+	"debug/buildinfo"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 )
 
@@ -43,15 +45,6 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 		resolvedPath = binaryPath
 	}
 
-	versionOut, err := exec.CommandContext(ctx, binaryPath, "--version").CombinedOutput()
-	if err != nil {
-		return Installation{}, versionCommandError(err, versionOut)
-	}
-	version, err := ParseVersion(string(versionOut))
-	if err != nil {
-		return Installation{}, err
-	}
-
 	home, _ := os.UserHomeDir()
 	env := Environment{
 		Home:       home,
@@ -64,8 +57,62 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 	if !ok {
 		return Installation{}, fmt.Errorf("unsupported Entire CLI installation at %s; supported update methods are Homebrew, install.sh, and go install", binaryPath)
 	}
+
+	versionOut, err := exec.CommandContext(ctx, binaryPath, "--version").CombinedOutput()
+	if err != nil {
+		return Installation{}, versionCommandError(err, versionOut)
+	}
+	version, err := ParseVersion(string(versionOut))
+	if err != nil {
+		if install.Method != MethodGo {
+			return Installation{}, err
+		}
+		parseErr := err
+		version, err = versionFromGoBuildInfo(resolvedPath)
+		if err != nil {
+			return Installation{}, fmt.Errorf("%w; Go build info fallback failed: %v", parseErr, err)
+		}
+	}
 	install.Version = version
 	return install, nil
+}
+
+func versionFromGoBuildInfo(binaryPath string) (Version, error) {
+	info, err := buildinfo.ReadFile(binaryPath)
+	if err != nil {
+		return Version{}, fmt.Errorf("read Go build info from %s: %w", binaryPath, err)
+	}
+	return versionFromBuildInfo(info)
+}
+
+func versionFromBuildInfo(info *debug.BuildInfo) (Version, error) {
+	if info == nil {
+		return Version{}, fmt.Errorf("missing Go build info")
+	}
+
+	candidates := []string{}
+	if isEntireCLIModulePath(info.Main.Path) {
+		candidates = append(candidates, info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep != nil && isEntireCLIModulePath(dep.Path) {
+			candidates = append(candidates, dep.Version)
+		}
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" || candidate == "(devel)" {
+			continue
+		}
+		if version, err := ParseVersion(candidate); err == nil {
+			return version, nil
+		}
+	}
+	return Version{}, fmt.Errorf("Go build info did not include an Entire CLI module version")
+}
+
+func isEntireCLIModulePath(path string) bool {
+	return path == "github.com/entireio/cli" || strings.HasPrefix(path, "github.com/entireio/cli/")
 }
 
 func versionCommandError(err error, output []byte) error {

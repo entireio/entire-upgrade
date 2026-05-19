@@ -25,6 +25,8 @@ type ExecRunner struct {
 	Stderr io.Writer
 }
 
+const installScriptGitHubTokenEnv = "ENTIRE_UPGRADE_GITHUB_TOKEN"
+
 func (r ExecRunner) Run(ctx context.Context, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = r.Stdout
@@ -177,11 +179,19 @@ func installWithHomebrew(ctx context.Context, runner Runner, install Installatio
 }
 
 func installWithCurl(ctx context.Context, runner Runner, channel Channel) error {
-	command := "set -o pipefail; curl -fsSL https://entire.io/install.sh | bash -s -- --channel " + string(channel)
+	command := installScriptCommand(channel)
 	if err := runner.Run(ctx, "bash", "-c", command); err != nil {
 		return fmt.Errorf("install.sh %s install: %w", channel, err)
 	}
 	return nil
+}
+
+func installScriptCommand(channel Channel) string {
+	command := "curl -fsSL https://entire.io/install.sh | bash -s -- --channel " + string(channel)
+	if os.Getenv(installScriptGitHubTokenEnv) != "" {
+		return "set -o pipefail; GITHUB_TOKEN=\"$" + installScriptGitHubTokenEnv + "\" bash -c '" + command + "'"
+	}
+	return "set -o pipefail; " + command
 }
 
 func installWithGo(ctx context.Context, runner Runner, target Version) error {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -90,6 +91,51 @@ func TestGoBinDirsDeduplicates(t *testing.T) {
 	}
 }
 
+func TestVersionFromBuildInfoUsesMainModuleVersion(t *testing.T) {
+	got, err := versionFromBuildInfo(&debug.BuildInfo{
+		Main: debug.Module{
+			Path:    "github.com/entireio/cli/cmd/entire",
+			Version: "v0.6.1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.6.1" {
+		t.Fatalf("version = %s, want 0.6.1", got)
+	}
+}
+
+func TestVersionFromBuildInfoUsesEntireDependencyVersion(t *testing.T) {
+	got, err := versionFromBuildInfo(&debug.BuildInfo{
+		Main: debug.Module{
+			Path:    "github.com/example/not-entire",
+			Version: "(devel)",
+		},
+		Deps: []*debug.Module{
+			{Path: "github.com/entireio/cli", Version: "v0.6.2-nightly.202605160654.ddf1a331"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.6.2-nightly.202605160654.ddf1a331" {
+		t.Fatalf("version = %s", got)
+	}
+}
+
+func TestVersionFromBuildInfoRejectsDevelVersion(t *testing.T) {
+	_, err := versionFromBuildInfo(&debug.BuildInfo{
+		Main: debug.Module{
+			Path:    "github.com/entireio/cli/cmd/entire",
+			Version: "(devel)",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected devel build info version to fail")
+	}
+}
+
 func TestInstallCommands(t *testing.T) {
 	target := mustVersion(t, "0.6.2-nightly.202605160654.ddf1a331")
 
@@ -159,6 +205,26 @@ func TestInstallCommands(t *testing.T) {
 				t.Fatalf("commands = %#v, want %#v", runner.commands, tt.want)
 			}
 		})
+	}
+}
+
+func TestInstallCurlUsesScopedGitHubTokenEnv(t *testing.T) {
+	t.Setenv(installScriptGitHubTokenEnv, "secret")
+
+	runner := &recordRunner{}
+	err := Install(context.Background(), runner, Installation{Method: MethodCurl}, mustVersion(t, "0.6.1"), StableChannel)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{
+		"bash -c set -o pipefail; GITHUB_TOKEN=\"$ENTIRE_UPGRADE_GITHUB_TOKEN\" bash -c 'curl -fsSL https://entire.io/install.sh | bash -s -- --channel stable'",
+	}
+	if !reflect.DeepEqual(runner.commands, want) {
+		t.Fatalf("commands = %#v, want %#v", runner.commands, want)
+	}
+	if strings.Contains(runner.commands[0], "secret") {
+		t.Fatalf("command leaked token value: %q", runner.commands[0])
 	}
 }
 

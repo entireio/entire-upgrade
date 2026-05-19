@@ -66,12 +66,17 @@ jobs:
           echo "HOME=$RUNNER_TEMP/entire-curl-home" >> "$GITHUB_ENV"
           echo "$RUNNER_TEMP/entire-curl-home/.local/bin" >> "$GITHUB_PATH"
       - name: Install Entire via install.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           mkdir -p "$HOME"
           curl -fsSL https://entire.io/install.sh | bash
           entire --version
       - name: Exercise upgrade plugin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ENTIRE_UPGRADE_GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./entire-upgrade | tee stable.log
           grep -F "(curl install)" stable.log
