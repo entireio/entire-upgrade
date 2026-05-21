@@ -1,0 +1,1 @@
+The GitHub Actions smoke test doesn’t seem to test Windows. Review and fix this.
