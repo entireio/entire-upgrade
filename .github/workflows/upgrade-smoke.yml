@@ -103,9 +103,47 @@ jobs:
           go install github.com/entireio/cli/cmd/entire@v0.6.1
           entire --version
       - name: Exercise upgrade plugin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./entire-upgrade | tee stable.log
           grep -F "(go install)" stable.log
           ./entire-upgrade --nightly | tee nightly.log
           grep -F "(go install)" nightly.log
+          entire --version
+
+  go-windows:
+    name: go install path (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: { go-version: "1.26.2" }
+      - run: go build -o entire-upgrade.exe ./cmd/entire-upgrade
+      - name: Configure isolated GOBIN
+        shell: pwsh
+        run: |
+          $goBin = Join-Path $env:RUNNER_TEMP "entire-go-bin"
+          "GOBIN=$goBin" >> $env:GITHUB_ENV
+          $goBin >> $env:GITHUB_PATH
+      - name: Install Entire via go install
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:GOBIN | Out-Null
+          go install github.com/entireio/cli/cmd/entire@v0.6.1
+          entire --version
+      - name: Exercise upgrade plugin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          .\entire-upgrade.exe | Tee-Object -FilePath stable.log
+          if (-not (Select-String -Path stable.log -SimpleMatch "(go install)" -Quiet)) {
+            throw "stable upgrade did not detect a go install"
+          }
+          .\entire-upgrade.exe --nightly | Tee-Object -FilePath nightly.log
+          if (-not (Select-String -Path nightly.log -SimpleMatch "(go install)" -Quiet)) {
+            throw "nightly upgrade did not detect a go install"
+          }
           entire --version
