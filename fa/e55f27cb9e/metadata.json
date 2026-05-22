@@ -1,0 +1,27 @@
+{
+  "cli_version": "v0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c",
+  "checkpoint_id": "fae55f27cb9e",
+  "strategy": "manual-commit",
+  "branch": "confirm-prompt-and-summary",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "internal/upgrade/install_test.go",
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fa/e55f27cb9e/0/metadata.json",
+      "transcript": "/fa/e55f27cb9e/0/full.jsonl",
+      "content_hash": "/fa/e55f27cb9e/0/content_hash.txt",
+      "prompt": "/fa/e55f27cb9e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 38941,
+    "cache_read_tokens": 2077043,
+    "output_tokens": 29769,
+    "api_call_count": 17
+  }
+}

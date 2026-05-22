@@ -1,0 +1,5 @@
+Err. I don't know if we should munge GOBIN.  Let's make sure we respect a user's weird PATH config.  First let's do the equivalent of `which entire`, and replace _that_ binary.
+
+---
+
+Err. I don't know if we should munge GOBIN.  Let's make sure we respect a user's weird PATH config.  First let's do the equivalent of `which entire`, and replace _that_ binary.
