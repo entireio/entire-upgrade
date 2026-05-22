@@ -1,0 +1,18 @@
+ok, i'm confused.  is this a bug?  why does entire-upgrade not think it was successful?  It looks to me like it was. 
+
+11:50:06 (git) confirm-prompt-...▲ $ ./entire-upgrade
+Detected Entire CLI 0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c at /Users/paul/go/bin/entire (go install)
+Latest stable build is 0.6.2
+We will now upgrade Entire CLI from 0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c to 0.6.2 using the go installer.
+Continue? [Y/n]
+Upgrading Entire CLI from 0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c to 0.6.2...
+entire 0.6.2 installed to /Users/paul/go/bin/entire (via go).
+upgrade command completed, but Entire CLI still reports 0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c; expected at least 0.6.2
+[paul@boulot] ~/src/entireio/entire-upgrade
+11:50:13 (git) confirm-prompt-...▲ $ which entire
+/Users/paul/go/bin/entire
+[paul@boulot] ~/src/entireio/entire-upgrade
+11:50:23 (git) confirm-prompt-...▲ $ /Users/paul/go/bin/entire version
+Entire CLI v0.6.2-nightly.202605140709.cc178b53-dev-6c434da3c (6c434da3c)
+Go version: go1.26.2
+OS/Arch: darwin/arm64
