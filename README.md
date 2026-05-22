@@ -1,6 +1,6 @@
-# entire-upgrade
+# Entire Upgrade
 
-An Entire CLI plugin that upgrades the system-installed `entire` binary.
+An [Entire CLI](https://github.com/entireio/cli) plugin that upgrades the system-installed `entire` binary.
 
 This plugin builds a binary named `entire-upgrade`, which is invoked as:
 
@@ -26,7 +26,7 @@ entire upgrade --stable
 The plugin detects whether the active `entire` binary was installed through
 Homebrew, `install.sh`, or `go install`, then runs the matching updater.
 
-## Installation & development
+## Installation & Development
 
 ```sh
 git clone https://github.com/entireio/entire-upgrade.git
