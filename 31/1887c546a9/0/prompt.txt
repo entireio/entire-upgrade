@@ -1,0 +1,9 @@
+update the PR description to explain that users with weird PATH config would end up with entire-upgrade being a no-op and unable to succeed.
+
+---
+
+alright.  anything we can simplify about this PR?
+
+---
+
+just do 2 & 3.
