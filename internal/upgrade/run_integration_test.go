@@ -3,6 +3,7 @@ package upgrade
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,6 +121,93 @@ func TestRunWithFakeGoInstall(t *testing.T) {
 	)
 }
 
+func TestRunWithFakeGoInstallReplacesBinaryWhenGobinDiffers(t *testing.T) {
+	// When the existing entire lives in $GOPATH/bin but GOBIN points
+	// elsewhere (e.g. a mise-managed Go), a plain `go install` would land
+	// the new binary in GOBIN and leave the existing one stale. The
+	// staging-then-rename path should instead replace the binary at its
+	// current location and leave GOBIN alone.
+	h := newFakeHarness(t)
+
+	goPath := filepath.Join(h.dir, "gopath")
+	existingBinDir := filepath.Join(goPath, "bin")
+	t.Setenv("ENTIRE_UPGRADE_FAKE_GOPATH", goPath)
+	t.Setenv("GOPATH", goPath)
+
+	foreignGoBin := filepath.Join(h.dir, "foreign-gobin")
+	if err := os.MkdirAll(foreignGoBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ENTIRE_UPGRADE_FAKE_GOBIN", foreignGoBin)
+	t.Setenv("GOBIN", foreignGoBin)
+
+	existingBinary := filepath.Join(existingBinDir, commandFilename("entire"))
+	h.installFakeCommandAt(existingBinary)
+	h.prependPath(existingBinDir, h.bin)
+
+	h.runUpgrade(t, NightlyChannel)
+	h.assertInstalledVersion(t, fakeNightlyVersion)
+
+	if _, err := os.Stat(filepath.Join(foreignGoBin, commandFilename("entire"))); !os.IsNotExist(err) {
+		t.Fatalf("new binary leaked into GOBIN at %s; want the existing path overwritten only (stat err: %v)", foreignGoBin, err)
+	}
+}
+
+func TestRunPromptDeclineAborts(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{
+		Channel: NightlyChannel,
+		Stdout:  &out,
+		Stderr:  &out,
+		Stdin:   strings.NewReader("n\n"),
+	})
+	if !errors.Is(err, ErrAborted) {
+		t.Fatalf("Run() error = %v, want ErrAborted\noutput:\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "Upgrade Entire CLI from "+fakeStableVersion+" to "+fakeNightlyVersion) {
+		t.Fatalf("output missing upgrade prompt:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Aborted.") {
+		t.Fatalf("output missing abort message:\n%s", out.String())
+	}
+	// Verify the installer was never invoked.
+	if log := h.readLog(t); strings.Contains(log, "go install") {
+		t.Fatalf("installer ran despite decline:\n%s", log)
+	}
+	h.assertInstalledVersion(t, fakeStableVersion)
+}
+
+func TestRunPromptAcceptProceeds(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{
+		Channel: NightlyChannel,
+		Stdout:  &out,
+		Stderr:  &out,
+		Stdin:   strings.NewReader("\n"),
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, out.String())
+	}
+	h.assertInstalledVersion(t, fakeNightlyVersion)
+	if !strings.Contains(out.String(), "installer? [Y/n]") {
+		t.Fatalf("output missing confirmation prompt:\n%s", out.String())
+	}
+}
+
 type fakeHarness struct {
 	t       *testing.T
 	dir     string
@@ -227,11 +315,15 @@ func (h *fakeHarness) runUpgradeWithOptions(t *testing.T, opts Options) {
 	var out bytes.Buffer
 	opts.Stdout = &out
 	opts.Stderr = &out
+	opts.Yes = true
 	if err := Run(context.Background(), opts); err != nil {
 		t.Fatalf("Run() error = %v\noutput:\n%s\nlog:\n%s", err, out.String(), h.readLog(t))
 	}
 	if !strings.Contains(out.String(), "Entire CLI upgrade complete") {
 		t.Fatalf("output did not report completion:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "installed to ") {
+		t.Fatalf("output did not report install path:\n%s", out.String())
 	}
 }
 
@@ -360,6 +452,24 @@ func fakeGo(stateDir string, args []string) int {
 		if err := os.WriteFile(filepath.Join(stateDir, "version.txt"), []byte(version), 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
+		}
+		// Mirror real `go install`: write the produced binary into $GOBIN.
+		// The production code routes this through a staging directory and
+		// renames the result over the existing entire binary.
+		if goBin := os.Getenv("GOBIN"); goBin != "" {
+			if err := os.MkdirAll(goBin, 0o755); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			executable, err := os.Executable()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			if err := copyFakeCommand(executable, filepath.Join(goBin, commandFilename("entire"))); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
 		}
 	}
 	return 0

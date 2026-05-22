@@ -185,14 +185,10 @@ func TestInstallCommands(t *testing.T) {
 				"bash -c set -o pipefail; curl -fsSL https://entire.io/install.sh | bash -s -- --channel nightly",
 			},
 		},
-		{
-			name:    "go installs exact target",
-			install: Installation{Method: MethodGo},
-			channel: NightlyChannel,
-			want: []string{
-				"go install github.com/entireio/cli/cmd/entire@v0.6.2-nightly.202605160654.ddf1a331",
-			},
-		},
+		// Go-install command-args verification lives in the integration test
+		// (TestRunWithFakeGoInstall), since the production path now stages to a
+		// temp dir and renames the resulting binary — operations that need a
+		// real subprocess to exercise.
 	}
 
 	for _, tt := range tests {
@@ -271,9 +267,15 @@ func TestVersionCommandErrorIncludesOutput(t *testing.T) {
 
 type recordRunner struct {
 	commands []string
+	envs     [][]string
 }
 
-func (r *recordRunner) Run(_ context.Context, name string, args ...string) error {
+func (r *recordRunner) Run(ctx context.Context, name string, args ...string) error {
+	return r.RunEnv(ctx, nil, name, args...)
+}
+
+func (r *recordRunner) RunEnv(_ context.Context, env []string, name string, args ...string) error {
 	r.commands = append(r.commands, strings.Join(append([]string{name}, args...), " "))
+	r.envs = append(r.envs, env)
 	return nil
 }

@@ -32,6 +32,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 
 	var nightly bool
 	var stable bool
+	var yes bool
 
 	cmd := &cobra.Command{
 		Use:           "entire-upgrade",
@@ -48,7 +49,8 @@ newer build is available.
 Examples:
   entire upgrade
   entire upgrade --stable
-  entire upgrade --nightly`,
+  entire upgrade --nightly
+  entire upgrade --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if stable && nightly {
 				return errors.New("--stable and --nightly cannot be used together")
@@ -66,12 +68,15 @@ Examples:
 				ExplicitChannel: explicitChannel,
 				Stdout:          cmd.OutOrStdout(),
 				Stderr:          cmd.ErrOrStderr(),
+				Stdin:           cmd.InOrStdin(),
+				Yes:             yes,
 			})
 		},
 	}
 
 	cmd.Flags().BoolVar(&stable, "stable", false, "switch back to the latest stable build")
 	cmd.Flags().BoolVar(&nightly, "nightly", false, "upgrade to the latest nightly build")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "skip the confirmation prompt")
 	cmd.AddCommand(newDoctorCommand(opts.Env))
 	cmd.AddCommand(newConfigCommand(opts.Env))
 	cmd.AddCommand(newVersionCommand(opts.Version))

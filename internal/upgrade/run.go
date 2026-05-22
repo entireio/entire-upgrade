@@ -1,11 +1,14 @@
 package upgrade
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,10 +17,19 @@ type Options struct {
 	ExplicitChannel bool
 	Stdout          io.Writer
 	Stderr          io.Writer
+	Stdin           io.Reader
+	// Yes skips the interactive confirmation prompt.
+	Yes bool
 }
+
+// ErrAborted is returned when the user declines the confirmation prompt.
+var ErrAborted = errors.New("upgrade aborted by user")
 
 type Runner interface {
 	Run(ctx context.Context, name string, args ...string) error
+	// RunEnv runs the command with extra env entries appended to the process env.
+	// Each entry is a "KEY=value" string; later entries override earlier ones.
+	RunEnv(ctx context.Context, env []string, name string, args ...string) error
 }
 
 type ExecRunner struct {
@@ -28,11 +40,15 @@ type ExecRunner struct {
 const installScriptGitHubTokenEnv = "ENTIRE_UPGRADE_GITHUB_TOKEN"
 
 func (r ExecRunner) Run(ctx context.Context, name string, args ...string) error {
+	return r.RunEnv(ctx, nil, name, args...)
+}
+
+func (r ExecRunner) RunEnv(ctx context.Context, env []string, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = r.Stdout
 	cmd.Stderr = r.Stderr
 	cmd.Stdin = os.Stdin
-	cmd.Env = commandEnvWithoutGitHubToken(os.Environ())
+	cmd.Env = append(commandEnvWithoutGitHubToken(os.Environ()), env...)
 	return cmd.Run()
 }
 
@@ -60,6 +76,10 @@ func Run(ctx context.Context, opts Options) error {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
+	stdin := opts.Stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
 
 	install, err := DetectInstallation(ctx)
 	if err != nil {
@@ -80,11 +100,23 @@ func Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	action := "Upgrading"
+	action := "Upgrade"
 	if compare < 0 || channelSwitch {
-		action = "Switching"
+		action = "Switch"
 	}
-	fmt.Fprintf(stdout, "%s Entire CLI from %s to %s...\n", action, install.Version, latest)
+
+	if !opts.Yes {
+		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, install.Version, latest, install.Method)
+		ok, err := confirm(stdout, stdin, prompt)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Fprintln(stdout, "Aborted.")
+			return ErrAborted
+		}
+	}
+
 	if err := Install(ctx, ExecRunner{Stdout: stdout, Stderr: stderr}, install, latest, channel); err != nil {
 		return err
 	}
@@ -100,8 +132,30 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
 	}
 
-	fmt.Fprintf(stdout, "Entire CLI upgrade complete. Now running %s.\n", verified.Version)
+	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
 	return nil
+}
+
+// confirm reads a yes/no answer from r, defaulting to yes on an empty line.
+// EOF is treated as a decline so non-interactive callers without --yes do not
+// silently proceed.
+func confirm(w io.Writer, r io.Reader, prompt string) (bool, error) {
+	fmt.Fprint(w, prompt)
+	scanner := bufio.NewScanner(r)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return false, fmt.Errorf("read confirmation: %w", err)
+		}
+		fmt.Fprintln(w)
+		return false, nil
+	}
+	answer := strings.ToLower(strings.TrimSpace(scanner.Text()))
+	switch answer {
+	case "", "y", "yes":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 func installationMatchesChannel(install Installation, channel Channel) bool {
@@ -134,7 +188,7 @@ func Install(ctx context.Context, runner Runner, install Installation, target Ve
 	case MethodCurl:
 		return installWithCurl(ctx, runner, channel)
 	case MethodGo:
-		return installWithGo(ctx, runner, target)
+		return installWithGo(ctx, runner, install, target)
 	default:
 		return fmt.Errorf("unsupported install method %q", install.Method)
 	}
@@ -194,13 +248,73 @@ func installScriptCommand(channel Channel) string {
 	return "set -o pipefail; " + command
 }
 
-func installWithGo(ctx context.Context, runner Runner, target Version) error {
+func installWithGo(ctx context.Context, runner Runner, install Installation, target Version) error {
 	if !target.Present {
 		return fmt.Errorf("go install target version is empty")
 	}
 	module := "github.com/entireio/cli/cmd/entire@" + target.Tag()
-	if err := runner.Run(ctx, "go", "install", module); err != nil {
+
+	// Route `go install` to a private staging dir so we can place the new
+	// binary exactly where the existing one lives, regardless of the user's
+	// GOBIN/GOPATH config. Otherwise `go install` would land it in $GOBIN,
+	// which may not be the directory their PATH resolves `entire` from.
+	stagingDir, err := os.MkdirTemp("", "entire-upgrade-go-*")
+	if err != nil {
+		return fmt.Errorf("create staging dir: %w", err)
+	}
+	defer os.RemoveAll(stagingDir)
+
+	if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
 		return fmt.Errorf("go install %s: %w", module, err)
+	}
+
+	stagedBinary := filepath.Join(stagingDir, executableName("entire"))
+	if _, err := os.Stat(stagedBinary); err != nil {
+		return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
+	}
+
+	if err := replaceBinary(stagedBinary, install.BinaryPath); err != nil {
+		return fmt.Errorf("replace %s: %w", install.BinaryPath, err)
+	}
+	return nil
+}
+
+// replaceBinary atomically replaces dst with the contents of src. The new
+// file is staged as a sibling of dst so the rename stays on one filesystem.
+func replaceBinary(src, dst string) error {
+	dir := filepath.Dir(dst)
+	tmp, err := os.CreateTemp(dir, ".entire-upgrade-*")
+	if err != nil {
+		return fmt.Errorf("create temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	defer srcFile.Close()
+
+	if _, err := io.Copy(tmp, srcFile); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return err
+	}
+	if err := os.Rename(tmpPath, dst); err != nil {
+		cleanup()
+		return err
 	}
 	return nil
 }
