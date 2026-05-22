@@ -100,16 +100,14 @@ func Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	action := "upgrade"
-	actionLabel := "Upgrading"
+	action := "Upgrade"
 	if compare < 0 || channelSwitch {
-		action = "switch"
-		actionLabel = "Switching"
+		action = "Switch"
 	}
 
-	fmt.Fprintf(stdout, "We will now %s Entire CLI from %s to %s using the %s installer.\n", action, install.Version, latest, install.Method)
 	if !opts.Yes {
-		ok, err := confirm(stdout, stdin, "Continue? [Y/n] ")
+		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, install.Version, latest, install.Method)
+		ok, err := confirm(stdout, stdin, prompt)
 		if err != nil {
 			return err
 		}
@@ -119,7 +117,6 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	fmt.Fprintf(stdout, "%s Entire CLI from %s to %s...\n", actionLabel, install.Version, latest)
 	if err := Install(ctx, ExecRunner{Stdout: stdout, Stderr: stderr}, install, latest, channel); err != nil {
 		return err
 	}

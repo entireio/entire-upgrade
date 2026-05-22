@@ -122,11 +122,11 @@ func TestRunWithFakeGoInstall(t *testing.T) {
 }
 
 func TestRunWithFakeGoInstallReplacesBinaryWhenGobinDiffers(t *testing.T) {
-	// Reproduce paul@boulot's environment: existing entire lives in
-	// $GOPATH/bin, but GOBIN points elsewhere (e.g. mise's go install). A
-	// plain `go install` would land the new binary in GOBIN and leave the
-	// existing one stale. The staging-then-rename path should instead
-	// replace the binary at its current location and leave GOBIN alone.
+	// When the existing entire lives in $GOPATH/bin but GOBIN points
+	// elsewhere (e.g. a mise-managed Go), a plain `go install` would land
+	// the new binary in GOBIN and leave the existing one stale. The
+	// staging-then-rename path should instead replace the binary at its
+	// current location and leave GOBIN alone.
 	h := newFakeHarness(t)
 
 	goPath := filepath.Join(h.dir, "gopath")
@@ -171,8 +171,8 @@ func TestRunPromptDeclineAborts(t *testing.T) {
 	if !errors.Is(err, ErrAborted) {
 		t.Fatalf("Run() error = %v, want ErrAborted\noutput:\n%s", err, out.String())
 	}
-	if !strings.Contains(out.String(), "We will now upgrade Entire CLI") {
-		t.Fatalf("output missing prompt preamble:\n%s", out.String())
+	if !strings.Contains(out.String(), "Upgrade Entire CLI from "+fakeStableVersion+" to "+fakeNightlyVersion) {
+		t.Fatalf("output missing upgrade prompt:\n%s", out.String())
 	}
 	if !strings.Contains(out.String(), "Aborted.") {
 		t.Fatalf("output missing abort message:\n%s", out.String())
@@ -203,7 +203,7 @@ func TestRunPromptAcceptProceeds(t *testing.T) {
 		t.Fatalf("Run() error = %v\noutput:\n%s", err, out.String())
 	}
 	h.assertInstalledVersion(t, fakeNightlyVersion)
-	if !strings.Contains(out.String(), "Continue? [Y/n]") {
+	if !strings.Contains(out.String(), "installer? [Y/n]") {
 		t.Fatalf("output missing confirmation prompt:\n%s", out.String())
 	}
 }
