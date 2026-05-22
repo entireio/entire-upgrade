@@ -3,6 +3,7 @@ package upgrade
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,6 +121,61 @@ func TestRunWithFakeGoInstall(t *testing.T) {
 	)
 }
 
+func TestRunPromptDeclineAborts(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{
+		Channel: NightlyChannel,
+		Stdout:  &out,
+		Stderr:  &out,
+		Stdin:   strings.NewReader("n\n"),
+	})
+	if !errors.Is(err, ErrAborted) {
+		t.Fatalf("Run() error = %v, want ErrAborted\noutput:\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "We will now upgrade Entire CLI") {
+		t.Fatalf("output missing prompt preamble:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Aborted.") {
+		t.Fatalf("output missing abort message:\n%s", out.String())
+	}
+	// Verify the installer was never invoked.
+	if log := h.readLog(t); strings.Contains(log, "go install") {
+		t.Fatalf("installer ran despite decline:\n%s", log)
+	}
+	h.assertInstalledVersion(t, fakeStableVersion)
+}
+
+func TestRunPromptAcceptProceeds(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{
+		Channel: NightlyChannel,
+		Stdout:  &out,
+		Stderr:  &out,
+		Stdin:   strings.NewReader("\n"),
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, out.String())
+	}
+	h.assertInstalledVersion(t, fakeNightlyVersion)
+	if !strings.Contains(out.String(), "Continue? [Y/n]") {
+		t.Fatalf("output missing confirmation prompt:\n%s", out.String())
+	}
+}
+
 type fakeHarness struct {
 	t       *testing.T
 	dir     string
@@ -227,6 +283,7 @@ func (h *fakeHarness) runUpgradeWithOptions(t *testing.T, opts Options) {
 	var out bytes.Buffer
 	opts.Stdout = &out
 	opts.Stderr = &out
+	opts.Yes = true
 	if err := Run(context.Background(), opts); err != nil {
 		t.Fatalf("Run() error = %v\noutput:\n%s\nlog:\n%s", err, out.String(), h.readLog(t))
 	}

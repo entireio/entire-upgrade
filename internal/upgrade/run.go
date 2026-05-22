@@ -1,7 +1,9 @@
 package upgrade
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +16,13 @@ type Options struct {
 	ExplicitChannel bool
 	Stdout          io.Writer
 	Stderr          io.Writer
+	Stdin           io.Reader
+	// Yes skips the interactive confirmation prompt.
+	Yes bool
 }
+
+// ErrAborted is returned when the user declines the confirmation prompt.
+var ErrAborted = errors.New("upgrade aborted by user")
 
 type Runner interface {
 	Run(ctx context.Context, name string, args ...string) error
@@ -60,6 +68,10 @@ func Run(ctx context.Context, opts Options) error {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
+	stdin := opts.Stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
 
 	install, err := DetectInstallation(ctx)
 	if err != nil {
@@ -80,11 +92,26 @@ func Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	action := "Upgrading"
+	action := "upgrade"
+	actionLabel := "Upgrading"
 	if compare < 0 || channelSwitch {
-		action = "Switching"
+		action = "switch"
+		actionLabel = "Switching"
 	}
-	fmt.Fprintf(stdout, "%s Entire CLI from %s to %s...\n", action, install.Version, latest)
+
+	fmt.Fprintf(stdout, "We will now %s Entire CLI from %s to %s using the %s installer.\n", action, install.Version, latest, install.Method)
+	if !opts.Yes {
+		ok, err := confirm(stdout, stdin, "Continue? [Y/n] ")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Fprintln(stdout, "Aborted.")
+			return ErrAborted
+		}
+	}
+
+	fmt.Fprintf(stdout, "%s Entire CLI from %s to %s...\n", actionLabel, install.Version, latest)
 	if err := Install(ctx, ExecRunner{Stdout: stdout, Stderr: stderr}, install, latest, channel); err != nil {
 		return err
 	}
@@ -102,6 +129,28 @@ func Run(ctx context.Context, opts Options) error {
 
 	fmt.Fprintf(stdout, "Entire CLI upgrade complete. Now running %s.\n", verified.Version)
 	return nil
+}
+
+// confirm reads a yes/no answer from r, defaulting to yes on an empty line.
+// EOF is treated as a decline so non-interactive callers without --yes do not
+// silently proceed.
+func confirm(w io.Writer, r io.Reader, prompt string) (bool, error) {
+	fmt.Fprint(w, prompt)
+	scanner := bufio.NewScanner(r)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return false, fmt.Errorf("read confirmation: %w", err)
+		}
+		fmt.Fprintln(w)
+		return false, nil
+	}
+	answer := strings.ToLower(strings.TrimSpace(scanner.Text()))
+	switch answer {
+	case "", "y", "yes":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 func installationMatchesChannel(install Installation, channel Channel) bool {
