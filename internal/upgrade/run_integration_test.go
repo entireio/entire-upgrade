@@ -290,6 +290,9 @@ func (h *fakeHarness) runUpgradeWithOptions(t *testing.T, opts Options) {
 	if !strings.Contains(out.String(), "Entire CLI upgrade complete") {
 		t.Fatalf("output did not report completion:\n%s", out.String())
 	}
+	if !strings.Contains(out.String(), "installed to ") {
+		t.Fatalf("output did not report install path:\n%s", out.String())
+	}
 }
 
 func (h *fakeHarness) assertInstalledVersion(t *testing.T, want string) {
