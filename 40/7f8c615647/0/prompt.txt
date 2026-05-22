@@ -1,0 +1,5 @@
+make a branch for a few small changes:
+
+- instead of just blindly going ahead when executing ./entire-upgrade - start with a "We will now do X" message, with "Y/n to continue?" prompt
+
+- when finished, tell me what you've done (e.g., "binary X installed to Y")
