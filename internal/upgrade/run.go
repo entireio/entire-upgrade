@@ -116,11 +116,6 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	// The installer landed a new binary at install.BinaryPath. Report it now,
-	// before verification, so the user always learns where it went — even if
-	// the version/channel checks below fail.
-	fmt.Fprintf(stdout, "entire %s installed to %s (via %s).\n", latest, install.BinaryPath, install.Method)
-
 	verified, err := DetectInstallation(ctx)
 	if err != nil {
 		return fmt.Errorf("upgrade command completed, but verification failed: %w", err)
@@ -132,7 +127,7 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
 	}
 
-	fmt.Fprintf(stdout, "Entire CLI upgrade complete. Now running %s.\n", verified.Version)
+	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
 	return nil
 }
 
