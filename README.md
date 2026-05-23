@@ -26,21 +26,38 @@ entire upgrade --stable
 The plugin detects whether the active `entire` binary was installed through
 Homebrew, `install.sh`, or `go install`, then runs the matching updater.
 
-## Installation & Development
+## Installation
 
 ```sh
 git clone https://github.com/entireio/entire-upgrade.git
 cd entire-upgrade
-mise install && mise build
+mise build
 entire plugin install ./entire-upgrade --force
 ```
 
-For local development without installing the binary, run it directly:
+## Development
 
-```sh
-go run ./cmd/entire-upgrade
+This project uses [mise](https://mise.jdx.dev/) for task automation and dependency management.
+
+### Prerequisites
+
+- [mise](https://mise.jdx.dev/) - Install with `curl https://mise.run | sh`
+
+### Getting Started
+
+```
+# Clone the repository
+git clone https://github.com/entireio/entire-upgrade.git
+cd cli
+
+# Trust the mise configuration (required on first setup)
+mise trust
+
+# Install dependencies (including Go)
+mise install
+
+# Build the plugin
+mise run build
 ```
 
-The `doctor`, `config`, and `version` subcommands are for local
-diagnostics and plugin-environment inspection.
-
+The `doctor`, `config`, and `version` subcommands help with local diagnostics and plugin-environment inspection.
