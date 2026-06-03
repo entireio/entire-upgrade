@@ -7,9 +7,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
+
+// remoteHelperBinary is the git remote helper that ships in every Entire CLI
+// release beside entire. Its version is read exactly like entire's — `--version`
+// first, Go build info as a fallback (see detectHelperVersion).
+const remoteHelperBinary = "git-remote-entire"
 
 type Method string
 
@@ -25,6 +31,12 @@ type Installation struct {
 	ResolvedPath string
 	BrewCask     string
 	Version      Version
+	// HelperPath is where git-remote-entire is expected to live: beside the
+	// entire binary on PATH. HelperVersion is its baked-in version, or a
+	// zero (Present=false) Version when the helper is missing or its version
+	// can't be read.
+	HelperPath    string
+	HelperVersion Version
 }
 
 type Environment struct {
@@ -62,19 +74,56 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 	if err != nil {
 		return Installation{}, versionCommandError(err, versionOut)
 	}
-	version, err := ParseVersion(string(versionOut))
+	version, err := resolveVersion(versionOut, resolvedPath)
 	if err != nil {
-		if install.Method != MethodGo {
-			return Installation{}, err
-		}
-		parseErr := err
-		version, err = versionFromGoBuildInfo(resolvedPath)
-		if err != nil {
-			return Installation{}, fmt.Errorf("%w; Go build info fallback failed: %v", parseErr, err)
-		}
+		return Installation{}, err
 	}
 	install.Version = version
+
+	// git-remote-entire ships beside entire and is resolved by git off PATH
+	// from the same directory, so look for it there.
+	install.HelperPath = filepath.Join(filepath.Dir(install.BinaryPath), executableName(remoteHelperBinary))
+	install.HelperVersion = detectHelperVersion(ctx, install.HelperPath)
+
 	return install, nil
+}
+
+// resolveVersion turns a binary's `--version` output into a Version, falling
+// back to the Go build info compiled into the binary when the output can't be
+// parsed (the go-install build whose --version prints "dev"). entire and
+// git-remote-entire share this so both report their version identically.
+func resolveVersion(versionOut []byte, resolvedPath string) (Version, error) {
+	version, err := ParseVersion(string(versionOut))
+	if err == nil {
+		return version, nil
+	}
+	buildVersion, buildErr := versionFromGoBuildInfo(resolvedPath)
+	if buildErr != nil {
+		return Version{}, fmt.Errorf("%w; Go build info fallback failed: %v", err, buildErr)
+	}
+	return buildVersion, nil
+}
+
+// detectHelperVersion resolves git-remote-entire's version the same way as
+// entire — `--version`, then build info — but degrades to an absent Version
+// instead of erroring, since the helper may be missing or predate the
+// --version flag (older releases print a usage banner and exit non-zero). An
+// absent Version signals callers to (re)install it.
+func detectHelperVersion(ctx context.Context, helperPath string) Version {
+	resolved, err := filepath.EvalSymlinks(helperPath)
+	if err != nil {
+		resolved = helperPath
+	}
+	if out, err := exec.CommandContext(ctx, helperPath, "--version").CombinedOutput(); err == nil {
+		if version, perr := resolveVersion(out, resolved); perr == nil {
+			return version
+		}
+	}
+	// No --version (old helper) or unparseable output: read build info directly.
+	if version, err := versionFromGoBuildInfo(resolved); err == nil {
+		return version
+	}
+	return Version{}
 }
 
 func versionFromGoBuildInfo(binaryPath string) (Version, error) {
@@ -88,6 +137,17 @@ func versionFromGoBuildInfo(binaryPath string) (Version, error) {
 func versionFromBuildInfo(info *debug.BuildInfo) (Version, error) {
 	if info == nil {
 		return Version{}, fmt.Errorf("missing Go build info")
+	}
+
+	// Mirror the CLI's versioninfo.resolve: a GoReleaser `-X ...Version=` stamp
+	// wins over the module version. `go build -ldflags=...` records that whole
+	// flag string in build settings (and `-s -w` doesn't strip it), so release
+	// binaries — Homebrew and install.sh — expose their version here even
+	// though buildinfo.Main.Version is "(devel)" for a `go build`.
+	if raw, ok := ldflagsVersion(info.Settings); ok {
+		if version, err := ParseVersion(raw); err == nil {
+			return version, nil
+		}
 	}
 
 	candidates := []string{}
@@ -113,6 +173,25 @@ func versionFromBuildInfo(info *debug.BuildInfo) (Version, error) {
 
 func isEntireCLIModulePath(path string) bool {
 	return path == "github.com/entireio/cli" || strings.HasPrefix(path, "github.com/entireio/cli/")
+}
+
+// ldflagsVersionRE pulls the version out of the CLI's versioninfo stamp, as it
+// appears in the `-ldflags` build setting. GoReleaser emits `-X <path>=<value>`;
+// `go build` may render the linker flag as either `-X path=val` or `-X=path=val`.
+var ldflagsVersionRE = regexp.MustCompile(`-X[ =]github\.com/entireio/cli/cmd/entire/cli/versioninfo\.Version=(\S+)`)
+
+// ldflagsVersion extracts the versioninfo.Version stamp from the recorded
+// `-ldflags` build setting, if present.
+func ldflagsVersion(settings []debug.BuildSetting) (string, bool) {
+	for _, setting := range settings {
+		if setting.Key != "-ldflags" {
+			continue
+		}
+		if m := ldflagsVersionRE.FindStringSubmatch(setting.Value); m != nil {
+			return strings.Trim(m[1], `"'`), true
+		}
+	}
+	return "", false
 }
 
 func versionCommandError(err error, output []byte) error {

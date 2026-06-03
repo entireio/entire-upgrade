@@ -95,7 +95,11 @@ func Run(ctx context.Context, opts Options) error {
 
 	compare := latest.Compare(install.Version)
 	channelSwitch := opts.ExplicitChannel && !installationMatchesChannel(install, channel)
-	if compare <= 0 && !channelSwitch {
+	// git-remote-entire ships with entire but is versioned independently here:
+	// a missing or behind helper warrants an upgrade even when entire itself is
+	// current, otherwise the helper would never be brought along.
+	helperNeedsUpgrade := !install.HelperVersion.Present || latest.Compare(install.HelperVersion) > 0
+	if compare <= 0 && !channelSwitch && !helperNeedsUpgrade {
 		fmt.Fprintf(stdout, "Entire CLI is already up to date for the %s channel.\n", channel)
 		return nil
 	}
@@ -130,6 +134,15 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	if !installationMatchesChannel(verified, channel) {
 		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
+	}
+	// The helper must end up beside entire; its version is best-effort because
+	// not every install method exposes a readable build-info stamp, but its
+	// presence is not — a missing helper is the exact failure this guards.
+	if _, err := os.Stat(verified.HelperPath); err != nil {
+		return fmt.Errorf("upgrade command completed, but git-remote-entire is missing at %s: %w", verified.HelperPath, err)
+	}
+	if verified.HelperVersion.Present && verified.HelperVersion.Compare(latest) < 0 {
+		return fmt.Errorf("upgrade command completed, but git-remote-entire still reports %s; expected at least %s", verified.HelperVersion, latest)
 	}
 
 	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
@@ -248,15 +261,31 @@ func installScriptCommand(channel Channel) string {
 	return "set -o pipefail; " + command
 }
 
+// goInstallPackages are the Entire CLI binaries shipped in the release tarball.
+// `go install` builds from source, so each must be installed explicitly to keep
+// parity with the Homebrew and install.sh paths, which unpack both at once.
+var goInstallPackages = []string{
+	"github.com/entireio/cli/cmd/entire",
+	"github.com/entireio/cli/cmd/git-remote-entire",
+}
+
+// goPackageVersion returns the currently installed version of the binary built
+// from pkg, so the go-install path can skip packages already at the target.
+func goPackageVersion(pkg string, install Installation) Version {
+	if filepath.Base(pkg) == remoteHelperBinary {
+		return install.HelperVersion
+	}
+	return install.Version
+}
+
 func installWithGo(ctx context.Context, runner Runner, install Installation, target Version) error {
 	if !target.Present {
 		return fmt.Errorf("go install target version is empty")
 	}
-	module := "github.com/entireio/cli/cmd/entire@" + target.Tag()
 
 	// Route `go install` to a private staging dir so we can place the new
-	// binary exactly where the existing one lives, regardless of the user's
-	// GOBIN/GOPATH config. Otherwise `go install` would land it in $GOBIN,
+	// binaries exactly where the existing one lives, regardless of the user's
+	// GOBIN/GOPATH config. Otherwise `go install` would land them in $GOBIN,
 	// which may not be the directory their PATH resolves `entire` from.
 	stagingDir, err := os.MkdirTemp("", "entire-upgrade-go-*")
 	if err != nil {
@@ -264,17 +293,33 @@ func installWithGo(ctx context.Context, runner Runner, install Installation, tar
 	}
 	defer os.RemoveAll(stagingDir)
 
-	if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
-		return fmt.Errorf("go install %s: %w", module, err)
-	}
+	// git-remote-entire ships alongside entire, so install it into the same
+	// directory the entire binary already lives in.
+	binDir := filepath.Dir(install.BinaryPath)
 
-	stagedBinary := filepath.Join(stagingDir, executableName("entire"))
-	if _, err := os.Stat(stagedBinary); err != nil {
-		return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
-	}
+	for _, pkg := range goInstallPackages {
+		// Each binary is versioned independently: skip the rebuild when it is
+		// already at the target. A channel switch changes target.Tag(), so an
+		// equal-version comparison still triggers the needed reinstall.
+		if current := goPackageVersion(pkg, install); current.Present && target.Compare(current) == 0 {
+			continue
+		}
 
-	if err := replaceBinary(stagedBinary, install.BinaryPath); err != nil {
-		return fmt.Errorf("replace %s: %w", install.BinaryPath, err)
+		module := pkg + "@" + target.Tag()
+		if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
+			return fmt.Errorf("go install %s: %w", module, err)
+		}
+
+		binaryName := executableName(filepath.Base(pkg))
+		stagedBinary := filepath.Join(stagingDir, binaryName)
+		if _, err := os.Stat(stagedBinary); err != nil {
+			return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
+		}
+
+		dst := filepath.Join(binDir, binaryName)
+		if err := replaceBinary(stagedBinary, dst); err != nil {
+			return fmt.Errorf("replace %s: %w", dst, err)
+		}
 	}
 	return nil
 }

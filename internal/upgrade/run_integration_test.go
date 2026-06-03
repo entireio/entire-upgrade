@@ -118,7 +118,70 @@ func TestRunWithFakeGoInstall(t *testing.T) {
 	h.assertInstalledVersion(t, fakeNightlyVersion)
 	h.assertLogContains(t,
 		"go install github.com/entireio/cli/cmd/entire@v"+fakeNightlyVersion,
+		"go install github.com/entireio/cli/cmd/git-remote-entire@v"+fakeNightlyVersion,
 	)
+
+	// git-remote-entire ships alongside entire and must land in the same dir.
+	gitRemote := filepath.Join(goBin, commandFilename("git-remote-entire"))
+	if _, err := os.Stat(gitRemote); err != nil {
+		t.Fatalf("git-remote-entire not installed beside entire at %s: %v", gitRemote, err)
+	}
+}
+
+// TestRunInstallsMissingHelperWhenEntireCurrent reproduces the reported bug:
+// entire is already at the latest version, but git-remote-entire is absent. The
+// upgrade must still run and install only the missing helper — not bail with
+// "already up to date" and not needlessly reinstall entire.
+func TestRunInstallsMissingHelperWhenEntireCurrent(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	// entire already at the latest nightly; no git-remote-entire beside it.
+	if err := os.WriteFile(h.version, []byte(fakeNightlyVersion), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	h.runUpgrade(t, NightlyChannel)
+	h.assertInstalledVersion(t, fakeNightlyVersion)
+
+	// Only the helper should be (re)built; entire is already at the target.
+	h.assertLogContains(t, "go install github.com/entireio/cli/cmd/git-remote-entire@v"+fakeNightlyVersion)
+	if log := h.readLog(t); strings.Contains(log, "go install github.com/entireio/cli/cmd/entire@") {
+		t.Fatalf("entire was reinstalled despite being current:\n%s", log)
+	}
+	if _, err := os.Stat(filepath.Join(goBin, commandFilename("git-remote-entire"))); err != nil {
+		t.Fatalf("git-remote-entire not installed beside entire: %v", err)
+	}
+}
+
+// TestRunUpToDateWhenBothBinariesCurrent confirms the helper-aware gate doesn't
+// over-trigger: when entire and git-remote-entire are both at the latest
+// version, the upgrade reports "already up to date" and installs nothing.
+func TestRunUpToDateWhenBothBinariesCurrent(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	if err := os.WriteFile(h.version, []byte(fakeNightlyVersion), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("git-remote-entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	if err := Run(context.Background(), Options{Channel: NightlyChannel, Yes: true, Stdout: &out, Stderr: &out}); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "already up to date") {
+		t.Fatalf("expected up-to-date message, got:\n%s", out.String())
+	}
+	if log := h.readLog(t); strings.Contains(log, "go install") {
+		t.Fatalf("installer ran despite both binaries being current:\n%s", log)
+	}
 }
 
 func TestRunWithFakeGoInstallReplacesBinaryWhenGobinDiffers(t *testing.T) {
@@ -148,8 +211,14 @@ func TestRunWithFakeGoInstallReplacesBinaryWhenGobinDiffers(t *testing.T) {
 	h.runUpgrade(t, NightlyChannel)
 	h.assertInstalledVersion(t, fakeNightlyVersion)
 
-	if _, err := os.Stat(filepath.Join(foreignGoBin, commandFilename("entire"))); !os.IsNotExist(err) {
-		t.Fatalf("new binary leaked into GOBIN at %s; want the existing path overwritten only (stat err: %v)", foreignGoBin, err)
+	for _, name := range []string{"entire", "git-remote-entire"} {
+		if _, err := os.Stat(filepath.Join(foreignGoBin, commandFilename(name))); !os.IsNotExist(err) {
+			t.Fatalf("%s leaked into GOBIN at %s; want the existing bin dir written only (stat err: %v)", name, foreignGoBin, err)
+		}
+	}
+	gitRemote := filepath.Join(existingBinDir, commandFilename("git-remote-entire"))
+	if _, err := os.Stat(gitRemote); err != nil {
+		t.Fatalf("git-remote-entire not installed beside entire at %s: %v", gitRemote, err)
 	}
 }
 
@@ -390,6 +459,8 @@ func runFakeCommand() int {
 	switch name {
 	case "entire":
 		return fakeEntire(stateDir)
+	case "git-remote-entire":
+		return fakeGitRemoteEntire(stateDir, args)
 	case "brew":
 		return fakeBrew(stateDir, args)
 	case "go":
@@ -410,6 +481,24 @@ func fakeEntire(stateDir string) int {
 	}
 	fmt.Printf("Entire CLI %s (fake)\n", strings.TrimSpace(string(version)))
 	return 0
+}
+
+// fakeGitRemoteEntire mimics a modern git-remote-entire: `--version` prints a
+// parseable line (sharing entire's version, as the real binaries ship in
+// lockstep); any other invocation is the remote-helper protocol it doesn't
+// model, so it errors like an old binary lacking the flag.
+func fakeGitRemoteEntire(stateDir string, args []string) int {
+	if len(args) == 1 && args[0] == "--version" {
+		version, err := os.ReadFile(filepath.Join(stateDir, "version.txt"))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("git-remote-entire %s (fake)\n", strings.TrimSpace(string(version)))
+		return 0
+	}
+	fmt.Fprintln(os.Stderr, "usage: git-remote-entire <remote-name> <url>")
+	return 128
 }
 
 func fakeBrew(stateDir string, args []string) int {
@@ -447,15 +536,20 @@ func fakeGo(stateDir string, args []string) int {
 		return 1
 	}
 	if len(args) == 2 && args[0] == "install" {
-		version := args[1][strings.LastIndex(args[1], "@")+1:]
-		version = strings.TrimPrefix(version, "v")
+		spec := args[1]
+		at := strings.LastIndex(spec, "@")
+		version := strings.TrimPrefix(spec[at+1:], "v")
+		binName := commandFilename(filepath.Base(spec[:at]))
+		// The entire binary backs `entire --version`, used for verification.
+		// git-remote-entire shares the same release version, so writing it
+		// for either package keeps version.txt correct.
 		if err := os.WriteFile(filepath.Join(stateDir, "version.txt"), []byte(version), 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 		// Mirror real `go install`: write the produced binary into $GOBIN.
 		// The production code routes this through a staging directory and
-		// renames the result over the existing entire binary.
+		// renames the result over the existing binary.
 		if goBin := os.Getenv("GOBIN"); goBin != "" {
 			if err := os.MkdirAll(goBin, 0o755); err != nil {
 				fmt.Fprintln(os.Stderr, err)
@@ -466,7 +560,7 @@ func fakeGo(stateDir string, args []string) int {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
 			}
-			if err := copyFakeCommand(executable, filepath.Join(goBin, commandFilename("entire"))); err != nil {
+			if err := copyFakeCommand(executable, filepath.Join(goBin, binName)); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
 			}
@@ -488,6 +582,19 @@ func fakeBash(stateDir string, args []string) int {
 	if err := fakeSetVersionForChannel(stateDir, channel); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	// install.sh unpacks git-remote-entire beside entire in ~/.local/bin.
+	if home := os.Getenv("HOME"); home != "" {
+		executable, err := os.Executable()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		helper := filepath.Join(home, ".local", "bin", commandFilename(remoteHelperBinary))
+		if err := copyFakeCommand(executable, helper); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
 	}
 	return 0
 }
@@ -525,19 +632,27 @@ func fakeInstallBrewCask(cask, version string) error {
 		return err
 	}
 
-	caskBin := filepath.Join(prefix, "Caskroom", cask, version, commandFilename("entire"))
-	if err := copyFakeCommand(executable, caskBin); err != nil {
-		return err
-	}
+	// The cask ships entire and git-remote-entire together; install both so
+	// the upgrade's "helper landed beside entire" check sees what a real cask
+	// would produce.
+	for _, name := range []string{"entire", remoteHelperBinary} {
+		caskBin := filepath.Join(prefix, "Caskroom", cask, version, commandFilename(name))
+		if err := copyFakeCommand(executable, caskBin); err != nil {
+			return err
+		}
 
-	pathBin := filepath.Join(prefix, "bin", commandFilename("entire"))
-	if err := os.MkdirAll(filepath.Dir(pathBin), 0o755); err != nil {
-		return err
+		pathBin := filepath.Join(prefix, "bin", commandFilename(name))
+		if err := os.MkdirAll(filepath.Dir(pathBin), 0o755); err != nil {
+			return err
+		}
+		if err := os.Remove(pathBin); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.Symlink(caskBin, pathBin); err != nil {
+			return err
+		}
 	}
-	if err := os.Remove(pathBin); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return os.Symlink(caskBin, pathBin)
+	return nil
 }
 
 func copyFakeCommand(srcPath, dstPath string) error {
