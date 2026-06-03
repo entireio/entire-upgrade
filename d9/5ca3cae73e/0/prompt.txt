@@ -1,0 +1,1 @@
+we now ship both entire and git-remote-entire in the tarball - please upgrade both

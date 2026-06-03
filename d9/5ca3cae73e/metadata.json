@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.7.4-nightly.202606030753.317a6f99.0.20260603233507-917843abdd54",
+  "checkpoint_id": "d95ca3cae73e",
+  "strategy": "manual-commit",
+  "branch": "upgrade-git-remote-entire",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml",
+    "README.md",
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d9/5ca3cae73e/0/metadata.json",
+      "transcript": "/d9/5ca3cae73e/0/full.jsonl",
+      "content_hash": "/d9/5ca3cae73e/0/content_hash.txt",
+      "prompt": "/d9/5ca3cae73e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 5938,
+    "cache_creation_tokens": 63852,
+    "cache_read_tokens": 1134996,
+    "output_tokens": 14374,
+    "api_call_count": 24
+  }
+}
