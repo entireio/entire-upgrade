@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.7.3",
+  "checkpoint_id": "391b8dd6192d",
+  "session_id": "133d880d-aeab-4d0a-96e7-60b9f4899dec",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-04T00:48:54.107164Z",
+  "branch": "upgrade-git-remote-entire",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "internal/upgrade/install.go",
+    "internal/upgrade/run.go"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "5c863d3b2af0",
+  "checkpoint_transcript_start": 382,
+  "transcript_lines_at_start": 382,
+  "token_usage": {
+    "input_tokens": 1390,
+    "cache_creation_tokens": 29539,
+    "cache_read_tokens": 3596365,
+    "output_tokens": 22748,
+    "api_call_count": 22
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-04T00:48:54.088965Z",
+    "agent_lines": 104,
+    "agent_removed": 100,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 104,
+    "total_lines_changed": 204,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 104,
+      "agent_lines_removed": 100
+    }
+  ]
+}

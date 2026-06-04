@@ -1,0 +1,1 @@
+okay i squashed it all into one commit.  it's so much machinery though, is this all necessary?
