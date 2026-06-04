@@ -1,0 +1,48 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "9ac8d58d7318",
+  "session_id": "133d880d-aeab-4d0a-96e7-60b9f4899dec",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-04T01:57:21.222234Z",
+  "branch": "upgrade-git-remote-entire",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "c8448a61e15d",
+  "checkpoint_transcript_start": 795,
+  "transcript_lines_at_start": 795,
+  "token_usage": {
+    "input_tokens": 3043,
+    "cache_creation_tokens": 8343,
+    "cache_read_tokens": 1612233,
+    "output_tokens": 4544,
+    "api_call_count": 6
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-04T01:57:21.196136Z",
+    "agent_lines": 8,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 8,
+    "total_lines_changed": 8,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
