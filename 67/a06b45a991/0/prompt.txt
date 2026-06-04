@@ -1,0 +1,5 @@
+still failing.
+
+---
+
+WAT why didn't https://github.com/entireio/entire-upgrade/pull/4 CI run fail?  Have i misunderstood?

@@ -1,0 +1,25 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "67a06b45a991",
+  "strategy": "manual-commit",
+  "branch": "20260604-no-pin-golang",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/67/a06b45a991/0/metadata.json",
+      "transcript": "/67/a06b45a991/0/full.jsonl",
+      "content_hash": "/67/a06b45a991/0/content_hash.txt",
+      "prompt": "/67/a06b45a991/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 10393,
+    "cache_creation_tokens": 47775,
+    "cache_read_tokens": 5005725,
+    "output_tokens": 32670,
+    "api_call_count": 23
+  }
+}
