@@ -1,0 +1,20 @@
+look at this branch. i'm trying to make git-remote-entire come along for the ride when upgrading, but clearly that failed:
+
+look into it. (and yes i installed the latest entire-upgrade binary)
+
+09:16:23 (git) 20260603-adjust-login-prompt $ entire upgrade --nightly --yes
+Detected Entire CLI 0.7.4-nightly.202606030753.317a6f99.0.20260603233507-917843abdd54 at /Users/paul/go/bin/entire (go install)
+Latest nightly build is 0.7.4-nightly.202606030753.317a6f99
+Entire CLI is already up to date for the nightly channel.
+
+---
+
+so no changes to entireio/cli?
+
+---
+
+i'm adding 'git-remote-entire --version' as we speak.  make the changes so entire & git-remote-entire work exactly the same from this tool's pov
+
+---
+
+it's not in the working tree yet.  it's in ~/.claude/worktrees/cli/merry-wiggling-hamster, just READ there, don't stomp around outside your worktree.
