@@ -184,6 +184,37 @@ func TestRunUpToDateWhenBothBinariesCurrent(t *testing.T) {
 	}
 }
 
+// TestRunReinstallsWhenVersionUndeterminable covers a locally-built dev entire:
+// `entire --version` prints "dev" and the Go build info carries no version, so
+// neither source yields one. That must not be a hard error — it's treated as
+// out of date and reinstalled.
+func TestRunReinstallsWhenVersionUndeterminable(t *testing.T) {
+	h := newFakeHarness(t)
+	goBin := filepath.Join(h.dir, "go-bin")
+	h.setGoBin(goBin)
+
+	// A dev build reports an unparseable version.
+	if err := os.WriteFile(h.version, []byte("dev"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.installFakeCommandAt(filepath.Join(goBin, commandFilename("entire")))
+	h.prependPath(goBin, h.bin)
+
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{Channel: NightlyChannel, Yes: true, Stdout: &out, Stderr: &out})
+	if err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s\nlog:\n%s", err, out.String(), h.readLog(t))
+	}
+	if !strings.Contains(out.String(), "could not read its version") {
+		t.Fatalf("expected a note about the unreadable version, got:\n%s", out.String())
+	}
+	h.assertInstalledVersion(t, fakeNightlyVersion)
+	h.assertLogContains(t,
+		"go install github.com/entireio/cli/cmd/entire@v"+fakeNightlyVersion,
+		"go install github.com/entireio/cli/cmd/git-remote-entire@v"+fakeNightlyVersion,
+	)
+}
+
 func TestRunWithFakeGoInstallReplacesBinaryWhenGobinDiffers(t *testing.T) {
 	// When the existing entire lives in $GOPATH/bin but GOBIN points
 	// elsewhere (e.g. a mise-managed Go), a plain `go install` would land

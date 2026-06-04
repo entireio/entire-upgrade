@@ -2,7 +2,6 @@ package upgrade
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
@@ -289,13 +288,6 @@ func TestCommandEnvWithoutGitHubToken(t *testing.T) {
 	want := []string{"PATH=/bin", "HOME=/tmp/home"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("env = %#v, want %#v", got, want)
-	}
-}
-
-func TestVersionCommandErrorIncludesOutput(t *testing.T) {
-	err := versionCommandError(errors.New("exit status 1"), []byte("broken install\n"))
-	if !strings.Contains(err.Error(), "broken install") {
-		t.Fatalf("error = %q, want command output", err)
 	}
 }
 

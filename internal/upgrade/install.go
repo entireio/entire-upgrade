@@ -93,21 +93,17 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 		return Installation{}, fmt.Errorf("unsupported Entire CLI installation at %s; supported update methods are Homebrew, install.sh, and go install", binaryPath)
 	}
 
-	// Resolve every release binary beside the anchor. The anchor is the one we
-	// found on PATH, so its version must be readable; the rest may legitimately
-	// be missing or predate --version, in which case an absent Version tells
-	// callers to (re)install them.
+	// Resolve every release binary beside the anchor. An unreadable version —
+	// a missing binary, a local dev build (`--version` reports "dev" and the Go
+	// build info is "(devel)"), or a git-remote-entire predating --version —
+	// leaves Version absent, which callers treat as "(re)install it" rather than
+	// a hard failure. binDir is where the anchor lives, so the rest sit beside it.
 	binDir := filepath.Dir(binaryPath)
 	for _, rb := range releaseBinaries {
 		bin := ManagedBinary{Name: rb.Name, GoPkg: rb.GoPkg, Path: filepath.Join(binDir, executableName(rb.Name))}
-		version, verr := binaryVersion(ctx, bin.Path)
-		if verr != nil {
-			if rb.Name == anchorBinary {
-				return Installation{}, verr
-			}
-			version = Version{}
+		if version, verr := binaryVersion(ctx, bin.Path); verr == nil {
+			bin.Version = version
 		}
-		bin.Version = version
 		install.Binaries = append(install.Binaries, bin)
 	}
 	install.Version = install.Binaries[0].Version
@@ -117,9 +113,9 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 
 // binaryVersion reads a binary's version the same way for every release
 // executable: its `--version` output first, then the Go build info baked into
-// the binary (the go-install build whose --version prints "dev", or an older
-// git-remote-entire predating the flag). Returns an error only when neither
-// source yields a version (including a missing binary).
+// the binary. It returns an error only when neither yields a version; the
+// message names the binary and reports both attempts so the failure is
+// actionable rather than cryptic.
 func binaryVersion(ctx context.Context, path string) (Version, error) {
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -127,18 +123,23 @@ func binaryVersion(ctx context.Context, path string) (Version, error) {
 	}
 
 	out, cmdErr := exec.CommandContext(ctx, path, "--version").CombinedOutput()
-	if cmdErr == nil {
-		if version, perr := ParseVersion(string(out)); perr == nil {
+	var versionAttempt string
+	switch {
+	case cmdErr != nil:
+		versionAttempt = fmt.Sprintf("running %q failed: %v", filepath.Base(path)+" --version", cmdErr)
+	default:
+		version, parseErr := ParseVersion(string(out))
+		if parseErr == nil {
 			return version, nil
 		}
+		versionAttempt = fmt.Sprintf("could not parse %q output %q", filepath.Base(path)+" --version", strings.TrimSpace(string(out)))
 	}
+
 	if version, buildErr := versionFromGoBuildInfo(resolved); buildErr == nil {
 		return version, nil
 	}
-	if cmdErr != nil {
-		return Version{}, versionCommandError(cmdErr, out)
-	}
-	return Version{}, fmt.Errorf("could not determine %s version from --version output or Go build info", filepath.Base(path))
+	return Version{}, fmt.Errorf("could not determine %s version: %s; and reading Go build info from %s did not yield one either",
+		filepath.Base(path), versionAttempt, resolved)
 }
 
 func versionFromGoBuildInfo(binaryPath string) (Version, error) {
@@ -207,14 +208,6 @@ func ldflagsVersion(settings []debug.BuildSetting) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func versionCommandError(err error, output []byte) error {
-	message := strings.TrimSpace(string(output))
-	if message == "" {
-		return fmt.Errorf("failed to read installed Entire CLI version: %w", err)
-	}
-	return fmt.Errorf("failed to read installed Entire CLI version: %w: %s", err, message)
 }
 
 func ClassifyInstallation(binaryPath, resolvedPath string, env Environment) (Installation, bool) {

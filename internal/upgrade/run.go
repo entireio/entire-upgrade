@@ -85,7 +85,11 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Detected Entire CLI %s at %s (%s install)\n", install.Version, install.BinaryPath, install.Method)
+	if install.Version.Present {
+		fmt.Fprintf(stdout, "Detected Entire CLI %s at %s (%s install)\n", install.Version, install.BinaryPath, install.Method)
+	} else {
+		fmt.Fprintf(stdout, "Detected Entire CLI at %s (%s install); could not read its version (a local dev build?), so it will be reinstalled.\n", install.BinaryPath, install.Method)
+	}
 
 	latest, err := (ReleaseChecker{}).Latest(ctx, channel)
 	if err != nil {
@@ -109,7 +113,11 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	if !opts.Yes {
-		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, install.Version, latest, install.Method)
+		from := install.Version.String()
+		if !install.Version.Present {
+			from = "an unknown version"
+		}
+		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, from, latest, install.Method)
 		ok, err := confirm(stdout, stdin, prompt)
 		if err != nil {
 			return err
