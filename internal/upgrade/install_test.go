@@ -2,7 +2,6 @@ package upgrade
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
@@ -121,6 +120,40 @@ func TestVersionFromBuildInfoUsesEntireDependencyVersion(t *testing.T) {
 	}
 	if got.String() != "0.6.2-nightly.202605160654.ddf1a331" {
 		t.Fatalf("version = %s", got)
+	}
+}
+
+func TestVersionFromBuildInfoPrefersLdflagsStamp(t *testing.T) {
+	// Release binaries (Homebrew, install.sh) carry "(devel)" as the module
+	// version but a real version in the -ldflags stamp, just like git-remote-entire.
+	got, err := versionFromBuildInfo(&debug.BuildInfo{
+		Main: debug.Module{Path: "github.com/entireio/cli/cmd/git-remote-entire", Version: "(devel)"},
+		Settings: []debug.BuildSetting{
+			{Key: "-ldflags", Value: "-s -w -X github.com/entireio/cli/cmd/entire/cli/versioninfo.Version=0.7.4 -X github.com/entireio/cli/cmd/entire/cli/versioninfo.Commit=deadbeef"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.7.4" {
+		t.Fatalf("version = %s, want 0.7.4", got)
+	}
+}
+
+func TestVersionFromBuildInfoLdflagsStampWinsOverModule(t *testing.T) {
+	// The stamp is what `entire --version` reports, so it must win over the
+	// module version when they differ, matching the CLI's versioninfo.resolve.
+	got, err := versionFromBuildInfo(&debug.BuildInfo{
+		Main: debug.Module{Path: "github.com/entireio/cli/cmd/entire", Version: "v0.6.1"},
+		Settings: []debug.BuildSetting{
+			{Key: "-ldflags", Value: "-X github.com/entireio/cli/cmd/entire/cli/versioninfo.Version=0.7.4"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.7.4" {
+		t.Fatalf("version = %s, want 0.7.4 (ldflags stamp should win)", got)
 	}
 }
 
@@ -255,13 +288,6 @@ func TestCommandEnvWithoutGitHubToken(t *testing.T) {
 	want := []string{"PATH=/bin", "HOME=/tmp/home"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("env = %#v, want %#v", got, want)
-	}
-}
-
-func TestVersionCommandErrorIncludesOutput(t *testing.T) {
-	err := versionCommandError(errors.New("exit status 1"), []byte("broken install\n"))
-	if !strings.Contains(err.Error(), "broken install") {
-		t.Fatalf("error = %q, want command output", err)
 	}
 }
 

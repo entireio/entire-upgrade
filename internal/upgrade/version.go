@@ -26,8 +26,11 @@ type Version struct {
 const versionPattern = `([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?`
 
 var (
-	exactVersionRE      = regexp.MustCompile(`^v?` + versionPattern + `$`)
-	entireVersionLineRE = regexp.MustCompile(`(?m)^(?:Entire CLI|entire)\s+v?` + versionPattern + `(?:\s|$)`)
+	exactVersionRE = regexp.MustCompile(`^v?` + versionPattern + `$`)
+	// Matches the leading line of `entire --version` ("Entire CLI x.y.z") and
+	// `git-remote-entire --version` ("git-remote-entire x.y.z"). git-remote-entire
+	// precedes entire in the alternation so it isn't shadowed.
+	entireVersionLineRE = regexp.MustCompile(`(?m)^(?:Entire CLI|git-remote-entire|entire)\s+v?` + versionPattern + `(?:\s|$)`)
 )
 
 func ParseVersion(s string) (Version, error) {

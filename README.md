@@ -24,7 +24,10 @@ entire upgrade --stable
 ```
 
 The plugin detects whether the active `entire` binary was installed through
-Homebrew, `install.sh`, or `go install`, then runs the matching updater.
+Homebrew, `install.sh`, or `go install`, then runs the matching updater. Each
+release ships both `entire` and `git-remote-entire`, and the upgrade replaces
+both. The Homebrew and `install.sh` paths unpack the two binaries together; the
+`go install` path builds and installs each one beside the existing `entire`.
 
 ## Installation
 

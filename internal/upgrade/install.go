@@ -7,9 +7,30 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
+
+// anchorBinary is the executable we discover on PATH to locate the install
+// (its directory and install method). Every other release binary is resolved
+// beside it. remoteHelperBinary is the git remote helper for entire:// URLs.
+const (
+	anchorBinary       = "entire"
+	remoteHelperBinary = "git-remote-entire"
+)
+
+// releaseBinaries is the set of executables shipped in an Entire CLI release.
+// They're versioned and (re)installed independently — even though releases
+// normally ship them in lockstep, a user's bin dir can drift. Add a binary
+// here and detection, gating, install, and verification all pick it up.
+var releaseBinaries = []struct {
+	Name  string // executable base name
+	GoPkg string // module path for `go install`
+}{
+	{Name: anchorBinary, GoPkg: "github.com/entireio/cli/cmd/entire"},
+	{Name: remoteHelperBinary, GoPkg: "github.com/entireio/cli/cmd/git-remote-entire"},
+}
 
 type Method string
 
@@ -24,7 +45,21 @@ type Installation struct {
 	BinaryPath   string
 	ResolvedPath string
 	BrewCask     string
-	Version      Version
+	// Version is the anchor (entire) version, kept for the channel/compare
+	// logic. It mirrors Binaries[0].Version.
+	Version Version
+	// Binaries are all the release executables this install manages, anchor
+	// first, each with its independently detected version (Present=false when
+	// missing or unreadable).
+	Binaries []ManagedBinary
+}
+
+// ManagedBinary is one release executable located beside the anchor.
+type ManagedBinary struct {
+	Name    string
+	GoPkg   string
+	Path    string
+	Version Version
 }
 
 type Environment struct {
@@ -58,23 +93,53 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 		return Installation{}, fmt.Errorf("unsupported Entire CLI installation at %s; supported update methods are Homebrew, install.sh, and go install", binaryPath)
 	}
 
-	versionOut, err := exec.CommandContext(ctx, binaryPath, "--version").CombinedOutput()
-	if err != nil {
-		return Installation{}, versionCommandError(err, versionOut)
-	}
-	version, err := ParseVersion(string(versionOut))
-	if err != nil {
-		if install.Method != MethodGo {
-			return Installation{}, err
+	// Resolve every release binary beside the anchor. An unreadable version —
+	// a missing binary, a local dev build (`--version` reports "dev" and the Go
+	// build info is "(devel)"), or a git-remote-entire predating --version —
+	// leaves Version absent, which callers treat as "(re)install it" rather than
+	// a hard failure. binDir is where the anchor lives, so the rest sit beside it.
+	binDir := filepath.Dir(binaryPath)
+	for _, rb := range releaseBinaries {
+		bin := ManagedBinary{Name: rb.Name, GoPkg: rb.GoPkg, Path: filepath.Join(binDir, executableName(rb.Name))}
+		if version, verr := binaryVersion(ctx, bin.Path); verr == nil {
+			bin.Version = version
 		}
-		parseErr := err
-		version, err = versionFromGoBuildInfo(resolvedPath)
-		if err != nil {
-			return Installation{}, fmt.Errorf("%w; Go build info fallback failed: %v", parseErr, err)
-		}
+		install.Binaries = append(install.Binaries, bin)
 	}
-	install.Version = version
+	install.Version = install.Binaries[0].Version
+
 	return install, nil
+}
+
+// binaryVersion reads a binary's version the same way for every release
+// executable: its `--version` output first, then the Go build info baked into
+// the binary. It returns an error only when neither yields a version; the
+// message names the binary and reports both attempts so the failure is
+// actionable rather than cryptic.
+func binaryVersion(ctx context.Context, path string) (Version, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		resolved = path
+	}
+
+	out, cmdErr := exec.CommandContext(ctx, path, "--version").CombinedOutput()
+	var versionAttempt string
+	switch {
+	case cmdErr != nil:
+		versionAttempt = fmt.Sprintf("running %q failed: %v", filepath.Base(path)+" --version", cmdErr)
+	default:
+		version, parseErr := ParseVersion(string(out))
+		if parseErr == nil {
+			return version, nil
+		}
+		versionAttempt = fmt.Sprintf("could not parse %q output %q", filepath.Base(path)+" --version", strings.TrimSpace(string(out)))
+	}
+
+	if version, buildErr := versionFromGoBuildInfo(resolved); buildErr == nil {
+		return version, nil
+	}
+	return Version{}, fmt.Errorf("could not determine %s version: %s; and reading Go build info from %s did not yield one either",
+		filepath.Base(path), versionAttempt, resolved)
 }
 
 func versionFromGoBuildInfo(binaryPath string) (Version, error) {
@@ -88,6 +153,17 @@ func versionFromGoBuildInfo(binaryPath string) (Version, error) {
 func versionFromBuildInfo(info *debug.BuildInfo) (Version, error) {
 	if info == nil {
 		return Version{}, fmt.Errorf("missing Go build info")
+	}
+
+	// Mirror the CLI's versioninfo.resolve: a GoReleaser `-X ...Version=` stamp
+	// wins over the module version. `go build -ldflags=...` records that whole
+	// flag string in build settings (and `-s -w` doesn't strip it), so release
+	// binaries — Homebrew and install.sh — expose their version here even
+	// though buildinfo.Main.Version is "(devel)" for a `go build`.
+	if raw, ok := ldflagsVersion(info.Settings); ok {
+		if version, err := ParseVersion(raw); err == nil {
+			return version, nil
+		}
 	}
 
 	candidates := []string{}
@@ -115,12 +191,23 @@ func isEntireCLIModulePath(path string) bool {
 	return path == "github.com/entireio/cli" || strings.HasPrefix(path, "github.com/entireio/cli/")
 }
 
-func versionCommandError(err error, output []byte) error {
-	message := strings.TrimSpace(string(output))
-	if message == "" {
-		return fmt.Errorf("failed to read installed Entire CLI version: %w", err)
+// ldflagsVersionRE pulls the version out of the CLI's versioninfo stamp, as it
+// appears in the `-ldflags` build setting. GoReleaser emits `-X <path>=<value>`;
+// `go build` may render the linker flag as either `-X path=val` or `-X=path=val`.
+var ldflagsVersionRE = regexp.MustCompile(`-X[ =]github\.com/entireio/cli/cmd/entire/cli/versioninfo\.Version=(\S+)`)
+
+// ldflagsVersion extracts the versioninfo.Version stamp from the recorded
+// `-ldflags` build setting, if present.
+func ldflagsVersion(settings []debug.BuildSetting) (string, bool) {
+	for _, setting := range settings {
+		if setting.Key != "-ldflags" {
+			continue
+		}
+		if m := ldflagsVersionRE.FindStringSubmatch(setting.Value); m != nil {
+			return strings.Trim(m[1], `"'`), true
+		}
 	}
-	return fmt.Errorf("failed to read installed Entire CLI version: %w: %s", err, message)
+	return "", false
 }
 
 func ClassifyInstallation(binaryPath, resolvedPath string, env Environment) (Installation, bool) {

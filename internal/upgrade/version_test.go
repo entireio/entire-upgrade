@@ -33,6 +33,20 @@ Entire CLI 0.6.1 (abcdef0)`
 	}
 }
 
+func TestParseVersionFromGitRemoteEntireOutput(t *testing.T) {
+	out := `git-remote-entire 0.7.4-nightly.202606030753.317a6f99
+Go version: go1.26.3
+OS/Arch: darwin/arm64`
+
+	got, err := ParseVersion(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "0.7.4-nightly.202606030753.317a6f99" {
+		t.Fatalf("version = %q", got)
+	}
+}
+
 func TestParseVersionRejectsOutputWithoutEntireVersion(t *testing.T) {
 	out := `Go version: go1.26.2
 OS/Arch: darwin/amd64`

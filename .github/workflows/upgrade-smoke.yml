@@ -44,6 +44,10 @@ jobs:
           brew install --cask entire
           entire --version
       - name: Exercise upgrade plugin
+        env:
+          # Authenticate the release-check API calls; the shared runner IP
+          # blows past GitHub's unauthenticated 60/hr limit otherwise.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           ./entire-upgrade --yes | tee stable.log
@@ -117,6 +121,7 @@ jobs:
           ./entire-upgrade --nightly --yes | tee nightly.log
           grep -F "(go install)" nightly.log
           entire --version
+          test -x "$GOBIN/git-remote-entire"
 
   go-windows:
     name: go install path (Windows)
@@ -158,3 +163,6 @@ jobs:
             throw "nightly upgrade did not detect a go install"
           }
           entire --version
+          if (-not (Test-Path (Join-Path $env:GOBIN "git-remote-entire.exe"))) {
+            throw "git-remote-entire was not installed beside entire"
+          }

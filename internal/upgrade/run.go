@@ -85,7 +85,18 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Detected Entire CLI %s at %s (%s install)\n", install.Version, install.BinaryPath, install.Method)
+	fmt.Fprintf(stdout, "Detected Entire CLI (%s install):\n", install.Method)
+	nameWidth := binaryNameWidth(install.Binaries)
+	for _, b := range install.Binaries {
+		switch {
+		case b.Version.Present:
+			fmt.Fprintf(stdout, "  %-*s %s at %s\n", nameWidth, b.Name, b.Version, b.Path)
+		case fileExists(b.Path):
+			fmt.Fprintf(stdout, "  %-*s (version unreadable, will reinstall) at %s\n", nameWidth, b.Name, b.Path)
+		default:
+			fmt.Fprintf(stdout, "  %-*s (not installed, will install) at %s\n", nameWidth, b.Name, b.Path)
+		}
+	}
 
 	latest, err := (ReleaseChecker{}).Latest(ctx, channel)
 	if err != nil {
@@ -95,7 +106,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	compare := latest.Compare(install.Version)
 	channelSwitch := opts.ExplicitChannel && !installationMatchesChannel(install, channel)
-	if compare <= 0 && !channelSwitch {
+	// Each managed binary is checked independently: a missing or behind binary
+	// (e.g. git-remote-entire when entire is already current) warrants an
+	// upgrade, otherwise it would never be brought along.
+	if !channelSwitch && !anyBinaryBehind(install, latest) {
 		fmt.Fprintf(stdout, "Entire CLI is already up to date for the %s channel.\n", channel)
 		return nil
 	}
@@ -106,7 +120,11 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	if !opts.Yes {
-		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, install.Version, latest, install.Method)
+		from := install.Version.String()
+		if !install.Version.Present {
+			from = "an unknown version"
+		}
+		prompt := fmt.Sprintf("%s Entire CLI from %s to %s using the %s installer? [Y/n] ", action, from, latest, install.Method)
 		ok, err := confirm(stdout, stdin, prompt)
 		if err != nil {
 			return err
@@ -125,14 +143,31 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("upgrade command completed, but verification failed: %w", err)
 	}
-	if verified.Version.Compare(latest) < 0 {
-		return fmt.Errorf("upgrade command completed, but Entire CLI still reports %s; expected at least %s", verified.Version, latest)
-	}
 	if !installationMatchesChannel(verified, channel) {
 		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
 	}
+	// Every managed binary must end up beside the anchor at the target version.
+	// Presence is mandatory — a missing binary is the exact failure this guards.
+	// The version is best-effort: not every binary exposes a readable version
+	// (an older git-remote-entire), so only enforce it when present.
+	for _, b := range verified.Binaries {
+		if _, err := os.Stat(b.Path); err != nil {
+			return fmt.Errorf("upgrade command completed, but %s is missing at %s: %w", b.Name, b.Path, err)
+		}
+		if b.Version.Present && b.Version.Compare(latest) < 0 {
+			return fmt.Errorf("upgrade command completed, but %s still reports %s; expected at least %s", b.Name, b.Version, latest)
+		}
+	}
 
-	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
+	fmt.Fprintf(stdout, "Entire CLI upgrade complete (%s install):\n", verified.Method)
+	nameWidth = binaryNameWidth(verified.Binaries)
+	for _, b := range verified.Binaries {
+		if b.Version.Present {
+			fmt.Fprintf(stdout, "  %-*s %s installed to %s\n", nameWidth, b.Name, b.Version, b.Path)
+		} else {
+			fmt.Fprintf(stdout, "  %-*s installed to %s\n", nameWidth, b.Name, b.Path)
+		}
+	}
 	return nil
 }
 
@@ -248,15 +283,42 @@ func installScriptCommand(channel Channel) string {
 	return "set -o pipefail; " + command
 }
 
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// binaryNameWidth returns the longest binary name, for column-aligning the
+// per-binary detection and completion output.
+func binaryNameWidth(binaries []ManagedBinary) int {
+	width := 0
+	for _, b := range binaries {
+		if len(b.Name) > width {
+			width = len(b.Name)
+		}
+	}
+	return width
+}
+
+// anyBinaryBehind reports whether any managed binary is missing or older than
+// latest, so the upgrade runs even when only one of them needs it.
+func anyBinaryBehind(install Installation, latest Version) bool {
+	for _, b := range install.Binaries {
+		if !b.Version.Present || latest.Compare(b.Version) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func installWithGo(ctx context.Context, runner Runner, install Installation, target Version) error {
 	if !target.Present {
 		return fmt.Errorf("go install target version is empty")
 	}
-	module := "github.com/entireio/cli/cmd/entire@" + target.Tag()
 
 	// Route `go install` to a private staging dir so we can place the new
-	// binary exactly where the existing one lives, regardless of the user's
-	// GOBIN/GOPATH config. Otherwise `go install` would land it in $GOBIN,
+	// binaries exactly where the existing one lives, regardless of the user's
+	// GOBIN/GOPATH config. Otherwise `go install` would land them in $GOBIN,
 	// which may not be the directory their PATH resolves `entire` from.
 	stagingDir, err := os.MkdirTemp("", "entire-upgrade-go-*")
 	if err != nil {
@@ -264,17 +326,29 @@ func installWithGo(ctx context.Context, runner Runner, install Installation, tar
 	}
 	defer os.RemoveAll(stagingDir)
 
-	if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
-		return fmt.Errorf("go install %s: %w", module, err)
-	}
+	for _, b := range install.Binaries {
+		// `go install` builds each binary from source, so install each one
+		// explicitly to match the Homebrew/install.sh tarballs that unpack them
+		// together. Skip a binary already at the target: a channel switch
+		// changes target.Tag(), so the equal-version check still reinstalls when
+		// the channel (not the version) is what differs.
+		if b.Version.Present && target.Compare(b.Version) == 0 {
+			continue
+		}
 
-	stagedBinary := filepath.Join(stagingDir, executableName("entire"))
-	if _, err := os.Stat(stagedBinary); err != nil {
-		return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
-	}
+		module := b.GoPkg + "@" + target.Tag()
+		if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
+			return fmt.Errorf("go install %s: %w", module, err)
+		}
 
-	if err := replaceBinary(stagedBinary, install.BinaryPath); err != nil {
-		return fmt.Errorf("replace %s: %w", install.BinaryPath, err)
+		stagedBinary := filepath.Join(stagingDir, executableName(b.Name))
+		if _, err := os.Stat(stagedBinary); err != nil {
+			return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
+		}
+
+		if err := replaceBinary(stagedBinary, b.Path); err != nil {
+			return fmt.Errorf("replace %s: %w", b.Path, err)
+		}
 	}
 	return nil
 }
