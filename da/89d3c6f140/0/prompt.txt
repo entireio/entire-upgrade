@@ -1,0 +1,3 @@
+ok it is completely baffling but they set GOTOOLCHAIN=local and use an ancient go.  fuck's sake.
+
+let's set GOTOOLCHAIN=auto

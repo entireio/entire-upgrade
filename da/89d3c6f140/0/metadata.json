@@ -1,0 +1,48 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "da89d3c6f140",
+  "session_id": "133d880d-aeab-4d0a-96e7-60b9f4899dec",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-04T01:30:44.094591Z",
+  "branch": "20260604-no-pin-golang",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/upgrade-smoke.yml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "73c35278e308",
+  "checkpoint_transcript_start": 744,
+  "transcript_lines_at_start": 744,
+  "token_usage": {
+    "input_tokens": 2791,
+    "cache_creation_tokens": 11263,
+    "cache_read_tokens": 1279718,
+    "output_tokens": 8131,
+    "api_call_count": 5
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-04T01:30:44.062233Z",
+    "agent_lines": 10,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 10,
+    "total_lines_changed": 10,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
