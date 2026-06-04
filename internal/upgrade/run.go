@@ -95,11 +95,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	compare := latest.Compare(install.Version)
 	channelSwitch := opts.ExplicitChannel && !installationMatchesChannel(install, channel)
-	// git-remote-entire ships with entire but is versioned independently here:
-	// a missing or behind helper warrants an upgrade even when entire itself is
-	// current, otherwise the helper would never be brought along.
-	helperNeedsUpgrade := !install.HelperVersion.Present || latest.Compare(install.HelperVersion) > 0
-	if compare <= 0 && !channelSwitch && !helperNeedsUpgrade {
+	// Each managed binary is checked independently: a missing or behind binary
+	// (e.g. git-remote-entire when entire is already current) warrants an
+	// upgrade, otherwise it would never be brought along.
+	if !channelSwitch && !anyBinaryBehind(install, latest) {
 		fmt.Fprintf(stdout, "Entire CLI is already up to date for the %s channel.\n", channel)
 		return nil
 	}
@@ -129,20 +128,20 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("upgrade command completed, but verification failed: %w", err)
 	}
-	if verified.Version.Compare(latest) < 0 {
-		return fmt.Errorf("upgrade command completed, but Entire CLI still reports %s; expected at least %s", verified.Version, latest)
-	}
 	if !installationMatchesChannel(verified, channel) {
 		return fmt.Errorf("upgrade command completed, but Entire CLI is still on the %s channel; expected %s", installedChannel(verified), channel)
 	}
-	// The helper must end up beside entire; its version is best-effort because
-	// not every install method exposes a readable build-info stamp, but its
-	// presence is not — a missing helper is the exact failure this guards.
-	if _, err := os.Stat(verified.HelperPath); err != nil {
-		return fmt.Errorf("upgrade command completed, but git-remote-entire is missing at %s: %w", verified.HelperPath, err)
-	}
-	if verified.HelperVersion.Present && verified.HelperVersion.Compare(latest) < 0 {
-		return fmt.Errorf("upgrade command completed, but git-remote-entire still reports %s; expected at least %s", verified.HelperVersion, latest)
+	// Every managed binary must end up beside the anchor at the target version.
+	// Presence is mandatory — a missing binary is the exact failure this guards.
+	// The version is best-effort: not every binary exposes a readable version
+	// (an older git-remote-entire), so only enforce it when present.
+	for _, b := range verified.Binaries {
+		if _, err := os.Stat(b.Path); err != nil {
+			return fmt.Errorf("upgrade command completed, but %s is missing at %s: %w", b.Name, b.Path, err)
+		}
+		if b.Version.Present && b.Version.Compare(latest) < 0 {
+			return fmt.Errorf("upgrade command completed, but %s still reports %s; expected at least %s", b.Name, b.Version, latest)
+		}
 	}
 
 	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
@@ -261,21 +260,15 @@ func installScriptCommand(channel Channel) string {
 	return "set -o pipefail; " + command
 }
 
-// goInstallPackages are the Entire CLI binaries shipped in the release tarball.
-// `go install` builds from source, so each must be installed explicitly to keep
-// parity with the Homebrew and install.sh paths, which unpack both at once.
-var goInstallPackages = []string{
-	"github.com/entireio/cli/cmd/entire",
-	"github.com/entireio/cli/cmd/git-remote-entire",
-}
-
-// goPackageVersion returns the currently installed version of the binary built
-// from pkg, so the go-install path can skip packages already at the target.
-func goPackageVersion(pkg string, install Installation) Version {
-	if filepath.Base(pkg) == remoteHelperBinary {
-		return install.HelperVersion
+// anyBinaryBehind reports whether any managed binary is missing or older than
+// latest, so the upgrade runs even when only one of them needs it.
+func anyBinaryBehind(install Installation, latest Version) bool {
+	for _, b := range install.Binaries {
+		if !b.Version.Present || latest.Compare(b.Version) > 0 {
+			return true
+		}
 	}
-	return install.Version
+	return false
 }
 
 func installWithGo(ctx context.Context, runner Runner, install Installation, target Version) error {
@@ -293,32 +286,28 @@ func installWithGo(ctx context.Context, runner Runner, install Installation, tar
 	}
 	defer os.RemoveAll(stagingDir)
 
-	// git-remote-entire ships alongside entire, so install it into the same
-	// directory the entire binary already lives in.
-	binDir := filepath.Dir(install.BinaryPath)
-
-	for _, pkg := range goInstallPackages {
-		// Each binary is versioned independently: skip the rebuild when it is
-		// already at the target. A channel switch changes target.Tag(), so an
-		// equal-version comparison still triggers the needed reinstall.
-		if current := goPackageVersion(pkg, install); current.Present && target.Compare(current) == 0 {
+	for _, b := range install.Binaries {
+		// `go install` builds each binary from source, so install each one
+		// explicitly to match the Homebrew/install.sh tarballs that unpack them
+		// together. Skip a binary already at the target: a channel switch
+		// changes target.Tag(), so the equal-version check still reinstalls when
+		// the channel (not the version) is what differs.
+		if b.Version.Present && target.Compare(b.Version) == 0 {
 			continue
 		}
 
-		module := pkg + "@" + target.Tag()
+		module := b.GoPkg + "@" + target.Tag()
 		if err := runner.RunEnv(ctx, []string{"GOBIN=" + stagingDir}, "go", "install", module); err != nil {
 			return fmt.Errorf("go install %s: %w", module, err)
 		}
 
-		binaryName := executableName(filepath.Base(pkg))
-		stagedBinary := filepath.Join(stagingDir, binaryName)
+		stagedBinary := filepath.Join(stagingDir, executableName(b.Name))
 		if _, err := os.Stat(stagedBinary); err != nil {
 			return fmt.Errorf("go install %s completed but produced no binary at %s: %w", module, stagedBinary, err)
 		}
 
-		dst := filepath.Join(binDir, binaryName)
-		if err := replaceBinary(stagedBinary, dst); err != nil {
-			return fmt.Errorf("replace %s: %w", dst, err)
+		if err := replaceBinary(stagedBinary, b.Path); err != nil {
+			return fmt.Errorf("replace %s: %w", b.Path, err)
 		}
 	}
 	return nil

@@ -12,10 +12,25 @@ import (
 	"strings"
 )
 
-// remoteHelperBinary is the git remote helper that ships in every Entire CLI
-// release beside entire. Its version is read exactly like entire's — `--version`
-// first, Go build info as a fallback (see detectHelperVersion).
-const remoteHelperBinary = "git-remote-entire"
+// anchorBinary is the executable we discover on PATH to locate the install
+// (its directory and install method). Every other release binary is resolved
+// beside it. remoteHelperBinary is the git remote helper for entire:// URLs.
+const (
+	anchorBinary       = "entire"
+	remoteHelperBinary = "git-remote-entire"
+)
+
+// releaseBinaries is the set of executables shipped in an Entire CLI release.
+// They're versioned and (re)installed independently — even though releases
+// normally ship them in lockstep, a user's bin dir can drift. Add a binary
+// here and detection, gating, install, and verification all pick it up.
+var releaseBinaries = []struct {
+	Name  string // executable base name
+	GoPkg string // module path for `go install`
+}{
+	{Name: anchorBinary, GoPkg: "github.com/entireio/cli/cmd/entire"},
+	{Name: remoteHelperBinary, GoPkg: "github.com/entireio/cli/cmd/git-remote-entire"},
+}
 
 type Method string
 
@@ -30,13 +45,21 @@ type Installation struct {
 	BinaryPath   string
 	ResolvedPath string
 	BrewCask     string
-	Version      Version
-	// HelperPath is where git-remote-entire is expected to live: beside the
-	// entire binary on PATH. HelperVersion is its baked-in version, or a
-	// zero (Present=false) Version when the helper is missing or its version
-	// can't be read.
-	HelperPath    string
-	HelperVersion Version
+	// Version is the anchor (entire) version, kept for the channel/compare
+	// logic. It mirrors Binaries[0].Version.
+	Version Version
+	// Binaries are all the release executables this install manages, anchor
+	// first, each with its independently detected version (Present=false when
+	// missing or unreadable).
+	Binaries []ManagedBinary
+}
+
+// ManagedBinary is one release executable located beside the anchor.
+type ManagedBinary struct {
+	Name    string
+	GoPkg   string
+	Path    string
+	Version Version
 }
 
 type Environment struct {
@@ -70,60 +93,52 @@ func DetectInstallation(ctx context.Context) (Installation, error) {
 		return Installation{}, fmt.Errorf("unsupported Entire CLI installation at %s; supported update methods are Homebrew, install.sh, and go install", binaryPath)
 	}
 
-	versionOut, err := exec.CommandContext(ctx, binaryPath, "--version").CombinedOutput()
-	if err != nil {
-		return Installation{}, versionCommandError(err, versionOut)
+	// Resolve every release binary beside the anchor. The anchor is the one we
+	// found on PATH, so its version must be readable; the rest may legitimately
+	// be missing or predate --version, in which case an absent Version tells
+	// callers to (re)install them.
+	binDir := filepath.Dir(binaryPath)
+	for _, rb := range releaseBinaries {
+		bin := ManagedBinary{Name: rb.Name, GoPkg: rb.GoPkg, Path: filepath.Join(binDir, executableName(rb.Name))}
+		version, verr := binaryVersion(ctx, bin.Path)
+		if verr != nil {
+			if rb.Name == anchorBinary {
+				return Installation{}, verr
+			}
+			version = Version{}
+		}
+		bin.Version = version
+		install.Binaries = append(install.Binaries, bin)
 	}
-	version, err := resolveVersion(versionOut, resolvedPath)
-	if err != nil {
-		return Installation{}, err
-	}
-	install.Version = version
-
-	// git-remote-entire ships beside entire and is resolved by git off PATH
-	// from the same directory, so look for it there.
-	install.HelperPath = filepath.Join(filepath.Dir(install.BinaryPath), executableName(remoteHelperBinary))
-	install.HelperVersion = detectHelperVersion(ctx, install.HelperPath)
+	install.Version = install.Binaries[0].Version
 
 	return install, nil
 }
 
-// resolveVersion turns a binary's `--version` output into a Version, falling
-// back to the Go build info compiled into the binary when the output can't be
-// parsed (the go-install build whose --version prints "dev"). entire and
-// git-remote-entire share this so both report their version identically.
-func resolveVersion(versionOut []byte, resolvedPath string) (Version, error) {
-	version, err := ParseVersion(string(versionOut))
-	if err == nil {
-		return version, nil
-	}
-	buildVersion, buildErr := versionFromGoBuildInfo(resolvedPath)
-	if buildErr != nil {
-		return Version{}, fmt.Errorf("%w; Go build info fallback failed: %v", err, buildErr)
-	}
-	return buildVersion, nil
-}
-
-// detectHelperVersion resolves git-remote-entire's version the same way as
-// entire — `--version`, then build info — but degrades to an absent Version
-// instead of erroring, since the helper may be missing or predate the
-// --version flag (older releases print a usage banner and exit non-zero). An
-// absent Version signals callers to (re)install it.
-func detectHelperVersion(ctx context.Context, helperPath string) Version {
-	resolved, err := filepath.EvalSymlinks(helperPath)
+// binaryVersion reads a binary's version the same way for every release
+// executable: its `--version` output first, then the Go build info baked into
+// the binary (the go-install build whose --version prints "dev", or an older
+// git-remote-entire predating the flag). Returns an error only when neither
+// source yields a version (including a missing binary).
+func binaryVersion(ctx context.Context, path string) (Version, error) {
+	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		resolved = helperPath
+		resolved = path
 	}
-	if out, err := exec.CommandContext(ctx, helperPath, "--version").CombinedOutput(); err == nil {
-		if version, perr := resolveVersion(out, resolved); perr == nil {
-			return version
+
+	out, cmdErr := exec.CommandContext(ctx, path, "--version").CombinedOutput()
+	if cmdErr == nil {
+		if version, perr := ParseVersion(string(out)); perr == nil {
+			return version, nil
 		}
 	}
-	// No --version (old helper) or unparseable output: read build info directly.
-	if version, err := versionFromGoBuildInfo(resolved); err == nil {
-		return version
+	if version, buildErr := versionFromGoBuildInfo(resolved); buildErr == nil {
+		return version, nil
 	}
-	return Version{}
+	if cmdErr != nil {
+		return Version{}, versionCommandError(cmdErr, out)
+	}
+	return Version{}, fmt.Errorf("could not determine %s version from --version output or Go build info", filepath.Base(path))
 }
 
 func versionFromGoBuildInfo(binaryPath string) (Version, error) {
