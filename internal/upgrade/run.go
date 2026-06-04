@@ -85,10 +85,16 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	if install.Version.Present {
-		fmt.Fprintf(stdout, "Detected Entire CLI %s at %s (%s install)\n", install.Version, install.BinaryPath, install.Method)
-	} else {
-		fmt.Fprintf(stdout, "Detected Entire CLI at %s (%s install); could not read its version (a local dev build?), so it will be reinstalled.\n", install.BinaryPath, install.Method)
+	fmt.Fprintf(stdout, "Detected Entire CLI (%s install):\n", install.Method)
+	for _, b := range install.Binaries {
+		switch {
+		case b.Version.Present:
+			fmt.Fprintf(stdout, "  %s %s at %s\n", b.Name, b.Version, b.Path)
+		case fileExists(b.Path):
+			fmt.Fprintf(stdout, "  %s (version unreadable, will reinstall) at %s\n", b.Name, b.Path)
+		default:
+			fmt.Fprintf(stdout, "  %s (not installed, will install) at %s\n", b.Name, b.Path)
+		}
 	}
 
 	latest, err := (ReleaseChecker{}).Latest(ctx, channel)
@@ -152,7 +158,14 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	fmt.Fprintf(stdout, "Entire CLI upgrade complete: entire %s installed to %s (via %s).\n", verified.Version, verified.BinaryPath, verified.Method)
+	fmt.Fprintf(stdout, "Entire CLI upgrade complete (%s install):\n", verified.Method)
+	for _, b := range verified.Binaries {
+		if b.Version.Present {
+			fmt.Fprintf(stdout, "  %s %s installed to %s\n", b.Name, b.Version, b.Path)
+		} else {
+			fmt.Fprintf(stdout, "  %s installed to %s\n", b.Name, b.Path)
+		}
+	}
 	return nil
 }
 
@@ -266,6 +279,11 @@ func installScriptCommand(channel Channel) string {
 		return "set -o pipefail; GITHUB_TOKEN=\"$" + installScriptGitHubTokenEnv + "\" bash -c '" + command + "'"
 	}
 	return "set -o pipefail; " + command
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // anyBinaryBehind reports whether any managed binary is missing or older than
