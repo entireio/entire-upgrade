@@ -45,9 +45,10 @@ jobs:
           entire --version
       - name: Exercise upgrade plugin
         run: |
-          ./entire-upgrade | tee stable.log
+          set -o pipefail
+          ./entire-upgrade --yes | tee stable.log
           grep -F "(homebrew install)" stable.log
-          ./entire-upgrade --nightly | tee nightly.log
+          ./entire-upgrade --nightly --yes | tee nightly.log
           grep -F "(homebrew install)" nightly.log
           hash -r
           entire --version
@@ -78,9 +79,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ENTIRE_UPGRADE_GITHUB_TOKEN: ${{ github.token }}
         run: |
-          ./entire-upgrade | tee stable.log
+          set -o pipefail
+          ./entire-upgrade --yes | tee stable.log
           grep -F "(curl install)" stable.log
-          ./entire-upgrade --nightly | tee nightly.log
+          ./entire-upgrade --nightly --yes | tee nightly.log
           grep -F "(curl install)" nightly.log
           entire --version
 
@@ -106,9 +108,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          ./entire-upgrade | tee stable.log
+          set -o pipefail
+          ./entire-upgrade --yes | tee stable.log
           grep -F "(go install)" stable.log
-          ./entire-upgrade --nightly | tee nightly.log
+          ./entire-upgrade --nightly --yes | tee nightly.log
           grep -F "(go install)" nightly.log
           entire --version
 
@@ -138,11 +141,13 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          .\entire-upgrade.exe | Tee-Object -FilePath stable.log
+          .\entire-upgrade.exe --yes | Tee-Object -FilePath stable.log
+          if ($LASTEXITCODE -ne 0) { throw "stable upgrade failed" }
           if (-not (Select-String -Path stable.log -SimpleMatch "(go install)" -Quiet)) {
             throw "stable upgrade did not detect a go install"
           }
-          .\entire-upgrade.exe --nightly | Tee-Object -FilePath nightly.log
+          .\entire-upgrade.exe --nightly --yes | Tee-Object -FilePath nightly.log
+          if ($LASTEXITCODE -ne 0) { throw "nightly upgrade failed" }
           if (-not (Select-String -Path nightly.log -SimpleMatch "(go install)" -Quiet)) {
             throw "nightly upgrade did not detect a go install"
           }
