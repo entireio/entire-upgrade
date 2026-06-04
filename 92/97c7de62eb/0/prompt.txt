@@ -1,0 +1,6 @@
+ok. weirdly, git-remote-entire wasn't installed? 
+
+12:57:41 (git) upgrade-git-rem...▲ ↑1 $ entire upgrade --nightly --yes
+Detected Entire CLI 0.7.4-nightly.202606030753.317a6f99 at /Users/paul/go/bin/entire (go install)
+Latest nightly build is 0.7.4-nightly.202606030753.317a6f99
+Entire CLI is already up to date for the nightly channel.

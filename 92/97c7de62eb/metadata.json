@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.4-nightly.202606030753.317a6f99",
+  "checkpoint_id": "9297c7de62eb",
+  "strategy": "manual-commit",
+  "branch": "upgrade-git-remote-entire",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "internal/upgrade/run.go",
+    "internal/upgrade/run_integration_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/92/97c7de62eb/0/metadata.json",
+      "transcript": "/92/97c7de62eb/0/full.jsonl",
+      "content_hash": "/92/97c7de62eb/0/content_hash.txt",
+      "prompt": "/92/97c7de62eb/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 273,
+    "cache_creation_tokens": 14285,
+    "cache_read_tokens": 3539763,
+    "output_tokens": 12861,
+    "api_call_count": 11
+  }
+}
