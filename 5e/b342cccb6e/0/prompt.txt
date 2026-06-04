@@ -1,0 +1,11 @@
+cool, commit.
+
+---
+
+Finally, i'd like to align things better:
+
+  entire            (version unreadable, will reinstall) at /Users/paul/go/bin/entire
+  git-remote-entire (version unreadable, will reinstall) at /Users/paul/go/bin/git-remote-entire
+...
+  entire            0.7.4-nightly.202606030753.317a6f99 installed to /Users/paul/go/bin/entire
+  git-remote-entire 0.7.4-nightly.202606030753.317a6f99 installed to /Users/paul/go/bin/git-remote-entire
