@@ -1,0 +1,37 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "ab17fa70cf8a",
+  "session_id": "133d880d-aeab-4d0a-96e7-60b9f4899dec",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-04T01:23:02.16132Z",
+  "branch": "20260604-no-pin-golang",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/test.yml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "2a7378ca30bc",
+  "token_usage": {
+    "input_tokens": 19639,
+    "cache_creation_tokens": 292696,
+    "cache_read_tokens": 20751534,
+    "output_tokens": 139277,
+    "api_call_count": 149
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-04T01:23:02.13641Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 3,
+    "total_committed": 0,
+    "total_lines_changed": 7,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}

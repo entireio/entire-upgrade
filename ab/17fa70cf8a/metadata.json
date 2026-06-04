@@ -1,0 +1,25 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "ab17fa70cf8a",
+  "strategy": "manual-commit",
+  "branch": "20260604-no-pin-golang",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/test.yml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ab/17fa70cf8a/0/metadata.json",
+      "transcript": "/ab/17fa70cf8a/0/full.jsonl",
+      "content_hash": "/ab/17fa70cf8a/0/content_hash.txt",
+      "prompt": "/ab/17fa70cf8a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 19639,
+    "cache_creation_tokens": 292696,
+    "cache_read_tokens": 20751534,
+    "output_tokens": 139277,
+    "api_call_count": 149
+  }
+}
