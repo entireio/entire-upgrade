@@ -205,7 +205,7 @@ func TestRunReinstallsWhenVersionUndeterminable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v\noutput:\n%s\nlog:\n%s", err, out.String(), h.readLog(t))
 	}
-	if !strings.Contains(out.String(), "entire (version unreadable, will reinstall)") {
+	if !strings.Contains(out.String(), "version unreadable, will reinstall") {
 		t.Fatalf("expected a per-binary note about the unreadable version, got:\n%s", out.String())
 	}
 	h.assertInstalledVersion(t, fakeNightlyVersion)

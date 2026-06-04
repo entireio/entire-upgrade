@@ -86,14 +86,15 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	fmt.Fprintf(stdout, "Detected Entire CLI (%s install):\n", install.Method)
+	nameWidth := binaryNameWidth(install.Binaries)
 	for _, b := range install.Binaries {
 		switch {
 		case b.Version.Present:
-			fmt.Fprintf(stdout, "  %s %s at %s\n", b.Name, b.Version, b.Path)
+			fmt.Fprintf(stdout, "  %-*s %s at %s\n", nameWidth, b.Name, b.Version, b.Path)
 		case fileExists(b.Path):
-			fmt.Fprintf(stdout, "  %s (version unreadable, will reinstall) at %s\n", b.Name, b.Path)
+			fmt.Fprintf(stdout, "  %-*s (version unreadable, will reinstall) at %s\n", nameWidth, b.Name, b.Path)
 		default:
-			fmt.Fprintf(stdout, "  %s (not installed, will install) at %s\n", b.Name, b.Path)
+			fmt.Fprintf(stdout, "  %-*s (not installed, will install) at %s\n", nameWidth, b.Name, b.Path)
 		}
 	}
 
@@ -159,11 +160,12 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	fmt.Fprintf(stdout, "Entire CLI upgrade complete (%s install):\n", verified.Method)
+	nameWidth = binaryNameWidth(verified.Binaries)
 	for _, b := range verified.Binaries {
 		if b.Version.Present {
-			fmt.Fprintf(stdout, "  %s %s installed to %s\n", b.Name, b.Version, b.Path)
+			fmt.Fprintf(stdout, "  %-*s %s installed to %s\n", nameWidth, b.Name, b.Version, b.Path)
 		} else {
-			fmt.Fprintf(stdout, "  %s installed to %s\n", b.Name, b.Path)
+			fmt.Fprintf(stdout, "  %-*s installed to %s\n", nameWidth, b.Name, b.Path)
 		}
 	}
 	return nil
@@ -284,6 +286,18 @@ func installScriptCommand(channel Channel) string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// binaryNameWidth returns the longest binary name, for column-aligning the
+// per-binary detection and completion output.
+func binaryNameWidth(binaries []ManagedBinary) int {
+	width := 0
+	for _, b := range binaries {
+		if len(b.Name) > width {
+			width = len(b.Name)
+		}
+	}
+	return width
 }
 
 // anyBinaryBehind reports whether any managed binary is missing or older than
