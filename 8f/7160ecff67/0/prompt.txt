@@ -1,0 +1,4 @@
+this is a very unfriendly error - tell me what you were trying (e.g., "checking binary xx: ..."
+
+11:56:56 (git) upgrade-git-rem...▲ $ entire upgrade --nightly --yes
+could not determine entire version from --version output or Go build info
