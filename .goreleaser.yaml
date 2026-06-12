@@ -1,0 +1,20 @@
+version: 2
+project_name: entire-upgrade
+
+builds:
+  - main: ./cmd/entire-upgrade
+    binary: entire-upgrade
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+
+# Asset shape consumed by `entire plugin install`:
+#   entire-upgrade_<version>_<os>_<arch>.tar.gz (zip on Windows) + checksums.txt
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
